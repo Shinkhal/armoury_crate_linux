@@ -1,0 +1,1 @@
+"""Armoury Crate application pages."""

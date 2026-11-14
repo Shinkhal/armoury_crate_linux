@@ -7,6 +7,6 @@ dist/
 
 # Windows-package assets and local reverse-engineering inputs are not licensed
 # for redistribution by this project.
-armoury-crate/assets/
-armoury-crate/recover_assets.py
+assets/
+recover_assets.py
 armoury-crate-reverse-engineering.md

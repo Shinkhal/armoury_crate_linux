@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""Command-line entry point for Armoury Crate."""
+from pathlib import Path
+import sys
+
+
+SOURCE_DIRS = (
+    Path(__file__).resolve().parent / "src",
+    Path.home() / ".local/share/armoury-crate/src",
+    Path("/usr/share/armoury-crate/src"),
+)
+
+for source_dir in SOURCE_DIRS:
+    if (source_dir / "app.py").is_file():
+        sys.path.insert(0, str(source_dir))
+        break
+
+from app import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

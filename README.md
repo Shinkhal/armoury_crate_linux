@@ -9,6 +9,16 @@ A community-built GTK4/libadwaita control center for supported ASUS laptops. It 
 - Keyboard backlight controls and supported Aura effects.
 - Integrated/hybrid GPU mode through `supergfxctl`.
 
+## Source layout
+
+- `src/app.py` and `src/window.py` provide startup and the shared application shell.
+- `src/pages/` contains the dashboard, device, cooling, battery, lighting, and GPU pages.
+- `src/components/` contains reusable GTK widgets; `src/hardware/` contains Linux telemetry and ASUS control integrations.
+- `src/config.py` and `src/styles.py` hold app settings and shared GTK styling.
+- `assets/` contains optional artwork and UI icons.
+- `packaging/` contains RPM and DEB build definitions.
+- `install-armoury-crate.sh` installs the launcher, source modules, and assets for the current user.
+
 Hardware support varies by laptop and firmware. Unsupported controls are not emulated: this app does not provide custom fan curves or per-key RGB where the firmware exposes no Linux interface.
 
 ## Requirements

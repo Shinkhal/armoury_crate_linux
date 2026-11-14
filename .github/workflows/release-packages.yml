@@ -1,0 +1,38 @@
+name: Build release packages
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install package builders
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev rpm
+      - name: Set release version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "${GITHUB_REF_NAME#v}" > VERSION
+          fi
+      - name: Build RPM and DEB packages
+        run: ./packaging/build-packages.sh
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: armoury-crate-packages
+          path: dist/*
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes

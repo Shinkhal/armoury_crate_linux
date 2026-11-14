@@ -15,7 +15,7 @@ Hardware support varies by laptop and firmware. Unsupported controls are not emu
 
 - A Linux desktop with Python 3, GTK 4, libadwaita, and PyGObject.
 - `asusctl` for ASUS profile, battery, and keyboard-lighting controls.
-- `supergfxctl` for GPU mode switching (optional).
+- `supergfxctl` for GPU mode switching.
 - An ASUS laptop with the corresponding kernel/firmware interfaces.
 
 Install those runtime dependencies using your distribution's package manager, then run:
@@ -29,6 +29,18 @@ The installer places the app in the current user's `~/.local` directories. To re
 ```sh
 ./install-armoury-crate.sh uninstall
 ```
+
+## Packages
+
+RPM and DEB packages are built for tagged releases and attached to the GitHub release. Both packages require `asusctl` and `supergfxctl`, in addition to the GTK/Python runtime dependencies. Install the matching service packages from repositories supported by your distribution before installing Armoury Crate.
+
+To build packages locally, install `rpmbuild` and `dpkg-deb`, then run:
+
+```sh
+./packaging/build-packages.sh
+```
+
+Artifacts are written to `dist/`.
 
 ## Artwork
 

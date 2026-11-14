@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Armoury Crate
+GenericName=ASUS Laptop Control Center
+Comment=ASUS performance, cooling, battery, lighting and GPU controls
+Exec=armoury-crate
+Icon=armoury-crate
+Terminal=false
+Categories=Settings;System;HardwareSettings;
+Keywords=asus;armoury;rog;tuf;gaming;fan;battery;gpu;performance;
+StartupNotify=true
+StartupWMClass=io.github.armourycrate

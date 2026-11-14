@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.swp
+*~
+.DS_Store
+
+# Windows-package assets and local reverse-engineering inputs are not licensed
+# for redistribution by this project.
+armoury-fedora-next/assets/
+armoury-fedora-next/recover_assets.py
+armoury-crate-reverse-engineering.md

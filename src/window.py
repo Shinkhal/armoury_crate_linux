@@ -8,10 +8,15 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from config import (
-    ASSET_DIR, GPU_MODES, PPD_IFACE, PPD_NAME, PPD_PATH, PROFILE_IDS,
+    ASSET_DIR, CHARGE_LIMITS, GPU_MODES, PPD_IFACE, PPD_NAME, PPD_PATH,
+    PROFILE_IDS,
 )
 from components.widgets import asus_image, label, page_heading
-from hardware.asus import command, fan_hwmon, fan_read, get_prop, read_limit, read_profile, rpm, set_prop
+from hardware.asus import (
+    command, fan_hwmon, fan_read, get_prop, int_or_none,
+    nearest_charge_limit, power_adapter_online, read_limit, read_profile,
+    rpm, set_prop,
+)
 from hardware.system import (
     cpu_freq_ghz, cpu_model, cpu_usage_percent, disk_usage, gpu_names,
     gpu_usage_percent, os_pretty_name, pretty_product_name, read_disks,

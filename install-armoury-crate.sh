@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-STAGING_DIR="$SCRIPT_DIR/armoury-fedora-next"
-BIN_SRC="$STAGING_DIR/armoury-fedora"
+STAGING_DIR="$SCRIPT_DIR/armoury-crate"
+BIN_SRC="$STAGING_DIR/armoury-crate"
 DESKTOP_SRC="$STAGING_DIR/io.github.armourycrate.desktop"
 ICON_SRC="$STAGING_DIR/armoury-crate.svg"
 APP_ICON_SRC="$STAGING_DIR/assets/asus_armourycrate_icon.png"
@@ -12,7 +12,8 @@ ASSET_SRC="$STAGING_DIR/assets"
 BIN_DST="$HOME/.local/bin/armoury-crate"
 DESKTOP_DST="$HOME/.local/share/applications/io.github.armourycrate.desktop"
 APP_ICON_DST="$HOME/.local/share/icons/hicolor/48x48/apps/armoury-crate.png"
-ASSET_DST="$HOME/.local/share/armoury-fedora/assets"
+ASSET_DST="$HOME/.local/share/armoury-crate/assets"
+LEGACY_ASSET_DST="$HOME/.local/share/armoury-fedora/assets"
 ICON_DST="$HOME/.local/share/icons/hicolor/scalable/apps/armoury-crate.svg"
 LEGACY_BIN_DST="$HOME/.local/bin/armoury-fedora"
 LEGACY_DESKTOP_DST="$HOME/.local/share/applications/armoury-fedora.desktop"
@@ -39,6 +40,10 @@ install_files() {
     else
         install -m 644 "$ICON_SRC" "$ICON_DST"
         rm -f "$APP_ICON_DST"
+    fi
+    if [ -d "$LEGACY_ASSET_DST" ] && [ ! -d "$ASSET_DST" ]; then
+        mkdir -p "$(dirname "$ASSET_DST")"
+        cp -a "$LEGACY_ASSET_DST" "$ASSET_DST"
     fi
     if [ -d "$ASSET_SRC" ]; then
         cp -a "$ASSET_SRC/." "$ASSET_DST/"

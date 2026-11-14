@@ -1,4 +1,4 @@
-# Armoury Crate (unofficial Linux controls)
+# Armoury Crate for Linux (unofficial)
 
 A community-built GTK4/libadwaita control center for supported ASUS laptops. It is an independent project and is not affiliated with or endorsed by ASUS. ASUS, ROG, TUF, and Armoury Crate are trademarks of their respective owners.
 
@@ -13,21 +13,21 @@ Hardware support varies by laptop and firmware. Unsupported controls are not emu
 
 ## Requirements
 
-- Fedora Linux with Python 3, GTK 4, libadwaita, and PyGObject.
+- A Linux desktop with Python 3, GTK 4, libadwaita, and PyGObject.
 - `asusctl` for ASUS profile, battery, and keyboard-lighting controls.
 - `supergfxctl` for GPU mode switching (optional).
 - An ASUS laptop with the corresponding kernel/firmware interfaces.
 
-Install the runtime packages using Fedora's package manager, then run:
+Install those runtime dependencies using your distribution's package manager, then run:
 
 ```sh
-./install-armoury-fedora.sh install
+./install-armoury-crate.sh install
 ```
 
 The installer places the app in the current user's `~/.local` directories. To remove it:
 
 ```sh
-./install-armoury-fedora.sh uninstall
+./install-armoury-crate.sh uninstall
 ```
 
 ## Artwork

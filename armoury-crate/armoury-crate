@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Armoury Crate — native ASUS laptop controls for Linux."""
 import glob
+import math
 import os
 import subprocess
 import sys
@@ -32,6 +33,7 @@ EFFECT_OPTIONS = {
     "breathe": {"colours": 2, "speed": True},
     "rainbow-cycle": {"speed": True},
     "rainbow-wave": {"speed": True, "direction": True},
+    "rain": {"speed": True},
     "stars": {"colours": 2, "speed": True},
     "highlight": {"colours": 1, "speed": True},
     "laser": {"colours": 1, "speed": True},
@@ -41,8 +43,50 @@ EFFECT_OPTIONS = {
     "flash": {"colours": 1},
 }
 AURA_SPEEDS = ["low", "med", "high"]
+AURA_SPEED_LABELS = ["Low", "Medium", "High"]
 AURA_DIRECTIONS = ["up", "down", "left", "right"]
-AURA_PRESETS = {"Red": "ff2050", "White": "ffffff", "Blue": "3d8eff", "Green": "4cd98a", "Yellow": "ffd23d", "Cyan": "3dd6d0", "Purple": "b06bff", "Orange": "ff9a3d"}
+AURA_DIRECTION_LABELS = ["Up", "Down", "Left", "Right"]
+AURA_PRESETS = {
+    "ROG Red": "ff2050",
+    "Red": "ff0000",
+    "Orange": "ff7a00",
+    "Yellow": "ffd400",
+    "Green": "00c853",
+    "Cyan": "00d6e8",
+    "Blue": "1769ff",
+    "Purple": "8b5cf6",
+    "Magenta": "f000b8",
+    "Pink": "ff6b92",
+    "White": "f5f5f5",
+}
+EFFECT_LABELS = {
+    "static": "Static",
+    "breathe": "Breathing",
+    "rainbow-cycle": "Rainbow Cycle",
+    "rainbow-wave": "Rainbow Wave",
+    "rain": "Rain",
+    "stars": "Stars",
+    "highlight": "Highlight",
+    "laser": "Laser",
+    "ripple": "Ripple",
+    "pulse": "Pulse",
+    "comet": "Comet",
+    "flash": "Flash",
+}
+EFFECT_DESCRIPTIONS = {
+    "static": "A steady single-colour glow.",
+    "breathe": "Fade smoothly between two colours.",
+    "rainbow-cycle": "Cycle through the colour spectrum.",
+    "rainbow-wave": "Move a rainbow wave in the chosen direction.",
+    "rain": "A flowing colour effect with adjustable speed.",
+    "stars": "Two-colour star-like pulses.",
+    "highlight": "A moving highlight in one colour.",
+    "laser": "A sweeping single-colour beam.",
+    "ripple": "A single-colour ripple effect.",
+    "pulse": "A steady single-colour pulse.",
+    "comet": "A single-colour comet trail.",
+    "flash": "A single-colour flash.",
+}
 GPU_MODES = ["Integrated", "Hybrid"]
 PPD_NAME = "org.freedesktop.UPower.PowerProfiles"
 PPD_PATH = "/org/freedesktop/UPower/PowerProfiles"
@@ -98,6 +142,18 @@ window .info-key { color: #7d8492; font-size: 10px; font-weight: 800; letter-spa
 window .info-val { color: #f4f5f8; font-size: 13px; font-weight: 700; }
 window .opt-key { color: #9aa2b1; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
 window .swatch { border-radius: 8px; border: 1px solid #303641; }
+window .lighting-description { color: #9299a7; font-size: 12px; }
+window .color-palette { margin-top: 2px; margin-bottom: 8px; }
+window button.color-swatch { min-width: 34px; min-height: 34px; padding: 3px; border-radius: 999px; background: transparent; border: 1px solid transparent; box-shadow: none; }
+window button.color-swatch:hover { background: #252a34; border-color: #5b6371; box-shadow: none; }
+window button.color-swatch.selected { background: rgba(229, 43, 69, 0.14); border-color: #ff4059; box-shadow: none; }
+window .color-chip { min-width: 22px; min-height: 22px; }
+window .color-picker-button { min-height: 36px; }
+window entry.hex-entry { min-width: 98px; font-family: monospace; letter-spacing: 0.4px; }
+window entry.hex-entry.invalid { border-color: #ff4059; }
+window button.brightness-option { min-width: 92px; min-height: 52px; background: #11151c; border: 1px solid #303641; color: #d9dde5; box-shadow: none; }
+window button.brightness-option:hover { background: #1b1e27; border-color: #68707d; box-shadow: none; }
+window button.brightness-option.active { background: rgba(229, 43, 69, 0.16); border-color: #ff4059; color: #fff; box-shadow: none; }
 window headerbar { background: #0d1016; border-bottom: 1px solid #232833; box-shadow: none; }
 window headerbar button { box-shadow: none; }
 window .header-title { color: #f4f5f8; font-size: 15px; font-weight: 600; letter-spacing: 0; }
@@ -105,6 +161,47 @@ window .monitor-value { font-size: 15px; font-weight: 800; }
 window .surface.monitor-card { padding: 20px 4px; background: transparent; border: 0; border-radius: 0; }
 window .monitor-panel-title { color: #f4f5f8; font-size: 28px; font-weight: 400; }
 window .monitor-header { color: #f4f5f8; font-size: 17px; font-weight: 700; }
+window .device-hero { min-height: 205px; padding: 22px; border: 1px solid #303641; border-radius: 12px; background: #0b0e13; }
+window .device-hero-copy { background: linear-gradient(90deg, rgba(9, 11, 16, .97), rgba(9, 11, 16, .82) 56%, rgba(9, 11, 16, .08)); padding: 18px; }
+window .dashboard-top { margin-bottom: 16px; }
+window .dashboard-monitor { min-width: 400px; }
+window .dashboard-monitor-grid { min-width: 400px; }
+window .dashboard-metric { padding: 12px; border-radius: 9px; }
+window .dashboard-metric .monitor-value { font-size: 14px; }
+window .system-info-panel { padding: 16px 18px; }
+window .system-info-row { min-height: 27px; }
+window .system-info-row:not(:last-child) { border-bottom: 1px solid rgba(120, 128, 142, .12); }
+window .system-info-row .info-key { min-width: 150px; }
+window .sidebar-brand { padding: 8px 5px 16px; }
+window .sidebar-brand-name { font-size: 11px; font-weight: 800; letter-spacing: .7px; }
+window .sidebar-brand-subtitle { color: #737b88; font-size: 9px; letter-spacing: 1.6px; }
+window .sidebar { padding: 8px 6px; }
+window .sidebar-brand { padding: 4px 2px 10px; }
+window .sidebar-menu-button { min-width: 34px; min-height: 34px; padding: 4px; background: transparent; border: 0; box-shadow: none; }
+window button.nav { min-height: 40px; margin: 1px 0; font-size: 13px; }
+window button.nav:checked { background: linear-gradient(90deg, rgba(229,43,69,.24), rgba(229,43,69,.06)); border-color: transparent; border-left: 3px solid #e52b45; }
+window .ac-dashboard { padding: 8px 10px 12px; }
+window .dashboard-toolbar { min-height: 48px; }
+window .dashboard-brand-image { min-width: 90px; min-height: 30px; }
+window .dashboard-machine-spec { font-size: 11px; color: #c6cad0; }
+window .dashboard-module { background: repeating-linear-gradient(135deg, #0e1116, #0e1116 3px, #12161c 3px, #12161c 5px); border: 1px solid #394047; border-radius: 3px; padding: 10px; }
+window .dashboard-module-title { min-height: 30px; padding: 4px 8px; color: #dce1e8; font-size: 13px; font-weight: 700; background: repeating-linear-gradient(135deg, #11151b, #11151b 4px, #171c22 4px, #171c22 6px); border: 1px solid #48515a; }
+window .dashboard-stat-row { min-height: 24px; }
+window .dashboard-stat-name { color: #d7dce4; font-size: 12px; }
+window .dashboard-stat-value { color: #fff; font-size: 12px; font-weight: 700; }
+window .dashboard-tiny { color: #8b949e; font-size: 10px; }
+window .dashboard-quick-button { background: linear-gradient(#282b30, #101216); color: #f2f4f6; border: 1px solid #5b6065; border-radius: 2px; padding: 6px 10px; box-shadow: none; }
+window .dashboard-mode-button { background: transparent; color: #ddd; border: 0; border-bottom: 2px solid #40464e; border-radius: 0; padding: 8px 4px; box-shadow: none; }
+window .dashboard-mode-button.active { color: #ff5268; border-bottom-color: #ff334f; background: rgba(229,43,69,.1); }
+window .dashboard-cpu-gauge { min-height: 330px; }
+window .dashboard-gauge-value { font-size: 30px; font-weight: 700; color: #f5f6f8; }
+window .dashboard-gauge-label { color: #b7bdc7; font-size: 11px; }
+window .dashboard-meter trough { min-height: 6px; background: #20252c; border-radius: 0; }
+window .dashboard-meter trough highlight { background: linear-gradient(90deg, #08aaff, #e52b45); border-radius: 0; }
+window .dashboard-profile-entry { padding: 8px 5px; }
+window .dashboard-profile-entry.active { background: rgba(229,43,69,.12); border-bottom: 2px solid #e52b45; }
+window .dashboard-unsupported { color: #7d858f; font-size: 11px; }
+window .dashboard-value-large { font-size: 20px; font-weight: 700; color: #f7f8fa; }
 window button.mode-option { background: transparent; border: 0; border-bottom: 1px solid #34363b; border-radius: 0; padding: 12px 10px 16px; box-shadow: none; }
 window button.mode-option:hover { background: #141417; box-shadow: none; }
 window button.mode-option.active { background: linear-gradient(180deg, transparent, rgba(220, 26, 47, .13)); border-bottom: 3px solid #e52b45; }
@@ -245,11 +342,7 @@ def rgba_hex(rgba):
 
 def make_rgba(hex_colour):
     rgba = Gdk.RGBA()
-    try:
-        rgba.parse("#" + hex_colour)
-    except TypeError:
-        rgba = Gdk.RGBA.parse("#" + hex_colour)
-    return rgba
+    return rgba if rgba.parse("#" + hex_colour.lstrip("#")) else None
 
 
 def read_memory():
@@ -320,6 +413,35 @@ def cpu_freq_ghz():
     except (OSError, ValueError, IndexError):
         return 0.0
     return total / count / 1000 if count else 0.0
+
+
+_cpu_times = None
+
+
+def cpu_usage_percent():
+    global _cpu_times
+    try:
+        with open("/proc/stat", encoding="utf-8") as stat_file:
+            values = [int(value) for value in stat_file.readline().split()[1:]]
+    except (OSError, ValueError, IndexError):
+        return None
+    total = sum(values)
+    idle = values[3] + (values[4] if len(values) > 4 else 0)
+    previous = _cpu_times
+    _cpu_times = (total, idle)
+    if previous is None or total <= previous[0]:
+        return None
+    delta_total = total - previous[0]
+    delta_idle = idle - previous[1]
+    return max(0.0, min(100.0, (delta_total - delta_idle) * 100 / delta_total))
+
+
+def gpu_usage_percent():
+    for path in glob.glob("/sys/class/drm/card*/device/gpu_busy_percent"):
+        value = int_or_none(text(path, ""))
+        if value is not None and 0 <= value <= 100:
+            return value
+    return None
 
 
 def cpu_model():
@@ -417,32 +539,24 @@ class ArmouryWindow(Gtk.ApplicationWindow):
         self.sidebar.set_size_request(250, -1)
         self.sidebar.add_css_class("sidebar")
         root.append(self.sidebar)
+        self.sidebar_collapsed = False
+        self.sidebar_labels = []
+        self.sidebar_compact_hidden = []
+        self.sidebar_nav_boxes = []
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=160)
         self.stack.set_hexpand(True)
         self.stack.set_vexpand(True)
         self.nav_buttons = {}
         self.pending_profile = None
         root.append(self.stack)
-        # Single headerbar for the whole app: current page title at the start,
+        # Single headerbar for the whole app: app title centered,
         # live status and refresh at the end. Minimize/maximize/close follow
         # the system's gtk-decoration-layout setting (theme + extensions).
         header = Adw.HeaderBar()
-        title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
-        app_icon = os.path.join(ASSET_DIR, "asus_armourycrate_icon.png")
-        if os.path.isfile(app_icon):
-            icon = Gtk.Picture.new_for_filename(app_icon)
-            icon.set_size_request(22, 22)
-            icon.set_can_shrink(True)
-            icon.set_content_fit(Gtk.ContentFit.CONTAIN)
-        else:
-            icon = Gtk.Image.new_from_icon_name("applications-games-symbolic")
-            icon.set_pixel_size(22)
-        title_box.append(icon)
         self.header_title = label("Armoury Crate", "header-title")
         self.header_title.set_wrap(False)
         self.header_title.set_ellipsize(0)
-        title_box.append(self.header_title)
-        header.pack_start(title_box)
+        header.set_title_widget(self.header_title)
         self.clock_status = label("●  SYSTEM CONNECTED", "status-dot")
         end_box = Gtk.Box(spacing=8)
         end_box.set_valign(Gtk.Align.CENTER)
@@ -458,30 +572,87 @@ class ArmouryWindow(Gtk.ApplicationWindow):
 
     def add_page(self, name, title, icon_file, fallback_icon, builder):
         button = Gtk.ToggleButton()
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10, halign=Gtk.Align.CENTER)
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10, halign=Gtk.Align.FILL)
         icon = asus_image(icon_file, fallback_icon, 16)
         if icon is not None:
             box.append(icon)
-        box.append(Gtk.Label(label=title))
+        nav_label = Gtk.Label(label=title, xalign=0)
+        box.append(nav_label)
         button.set_child(box)
+        button.set_tooltip_text(title)
         button.add_css_class("nav")
         button.connect("toggled", self.on_nav_toggled, name)
         self.sidebar.append(button)
         self.nav_buttons[name] = button
+        self.sidebar_labels.append(nav_label)
+        self.sidebar_nav_boxes.append(box)
         page = builder()
         self.stack.add_named(page, name)
 
     def build_pages(self):
-        self.add_page("home", "Home", "ic_laptop.svg", "computer-symbolic", self.build_home)
+        brand = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=7)
+        brand.add_css_class("sidebar-brand")
+        menu = Gtk.ToggleButton(tooltip_text="Expand navigation")
+        menu.add_css_class("sidebar-menu-button")
+        menu_glyph = Gtk.DrawingArea()
+        menu_glyph.set_content_width(18)
+        menu_glyph.set_content_height(18)
+        menu_glyph.set_draw_func(self.draw_sidebar_hamburger)
+        menu.set_child(menu_glyph)
+        menu.connect("toggled", self.on_sidebar_toggle)
+        self.sidebar_menu_button = menu
+        brand.append(menu)
+        brand_logo_path = os.path.join(ASSET_DIR, "asus_gc_landing_rog_logo.png")
+        if os.path.isfile(brand_logo_path):
+            brand_logo = Gtk.Picture.new_for_filename(brand_logo_path)
+            brand_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
+            brand_logo.set_size_request(72, 30)
+            brand.append(brand_logo)
+        brand_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        brand_text.append(label("ARMOURY CRATE", "sidebar-brand-name"))
+        brand_text.append(label("REPUBLIC OF GAMERS", "sidebar-brand-subtitle"))
+        brand.append(brand_text)
+        self.sidebar_compact_hidden.extend([brand_logo if os.path.isfile(brand_logo_path) else None, brand_text])
+        self.sidebar.append(brand)
         self.sidebar.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-        self.add_page("cooling", "Operating Mode", "ic_fan_alt.svg", "preferences-system-symbolic", self.build_cooling)
+        section_label = label("DEVICE", "nav-section")
+        device_label = label(pretty_product_name(text("/sys/class/dmi/id/product_name", "ASUS laptop")), "subtle")
+        self.sidebar.append(section_label)
+        self.sidebar.append(device_label)
+        self.sidebar_labels.extend([section_label, device_label])
+        self.sidebar.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        self.add_page("home", "Home", "ic_laptop.svg", "computer-symbolic", self.build_home)
+        self.add_page("device", "Device", "ic_laptop.svg", "computer-symbolic", self.build_device)
+        self.add_page("lighting", "Aura Sync", "ic_lighting.svg", "night-light-symbolic", self.build_lighting)
+        self.add_page("cooling", "Scenario Profiles", "ic_fan_alt.svg", "preferences-system-symbolic", self.build_cooling)
         self.add_page("battery", "Battery", None, "battery-symbolic", self.build_battery)
-        self.add_page("lighting", "Lighting", "ic_lighting.svg", "night-light-symbolic", self.build_lighting)
         self.add_page("gpu", "GPU Mode", "ic_gpu.svg", "video-display-symbolic", self.build_gpu)
         self.nav_buttons["home"].set_active(True)
         self.sidebar.append(Gtk.Box(vexpand=True))
-        self.sidebar.append(label("Live status · 4 sec refresh", "footer"))
+        footer = label("Live status · 4 sec refresh", "footer")
+        self.sidebar.append(footer)
+        self.sidebar_labels.append(footer)
         self.sidebar.set_margin_bottom(20)
+        menu.set_active(True)
+
+    def draw_sidebar_hamburger(self, _area, context, width, height):
+        context.set_source_rgba(.88, .91, .96, .95)
+        context.set_line_width(1.8)
+        context.set_line_cap(1)
+        for line in range(3):
+            y = height * (.25 + line * .25)
+            context.move_to(width * .17, y)
+            context.line_to(width * .83, y)
+        context.stroke()
+
+    def on_sidebar_toggle(self, button):
+        self.sidebar_collapsed = button.get_active()
+        self.sidebar.set_size_request(68 if self.sidebar_collapsed else 250, -1)
+        button.set_tooltip_text("Expand navigation" if self.sidebar_collapsed else "Collapse navigation")
+        for widget in self.sidebar_labels + [w for w in self.sidebar_compact_hidden if w is not None]:
+            widget.set_visible(not self.sidebar_collapsed)
+        for nav_box in self.sidebar_nav_boxes:
+            nav_box.set_halign(Gtk.Align.CENTER if self.sidebar_collapsed else Gtk.Align.FILL)
 
     def on_nav_toggled(self, button, name):
         if not button.get_active():
@@ -507,123 +678,304 @@ class ArmouryWindow(Gtk.ApplicationWindow):
         return outer, content
 
     def build_home(self):
-        outer, c = self.page_shell("", "Home", "")
-
-        columns = Gtk.Box(spacing=16)
-        left_column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
-        left_column.set_size_request(560, -1)
-        right_column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, hexpand=True)
-        hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        hero.add_css_class("surface")
-        hero.add_css_class("hero")
-        self.hero_device = label(pretty_product_name(text("/sys/class/dmi/id/product_name", "ASUS laptop")), "hero-device")
-        hero.append(self.hero_device)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        outer.add_css_class("main-content")
+        scroll = Gtk.ScrolledWindow(vexpand=True, hscrollbar_policy=Gtk.PolicyType.NEVER)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        content.add_css_class("ac-dashboard")
+        content.set_margin_start(8)
+        content.set_margin_end(8)
+        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        toolbar.add_css_class("dashboard-toolbar")
+        logo_path = os.path.join(ASSET_DIR, "asus_gc_landing_rog_logo.png")
+        if os.path.isfile(logo_path):
+            logo = Gtk.Picture.new_for_filename(logo_path)
+            logo.set_content_fit(Gtk.ContentFit.CONTAIN)
+            logo.set_size_request(105, 28)
+            logo.add_css_class("dashboard-brand-image")
+            toolbar.append(logo)
+        toolbar.append(Gtk.Box(hexpand=True))
         dgpu, _igpu = gpu_names()
-        for spec_line in (f"CPU   {cpu_model()}", f"GPU   {dgpu}"):
-            spec = label(spec_line, "hero-spec")
-            spec.set_wrap(False)
-            spec.set_ellipsize(1)
-            hero.append(spec)
-        left_column.append(hero)
+        machine_specs = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self.dashboard_cpu_model = label(cpu_model(), "dashboard-machine-spec")
+        self.dashboard_gpu_model = label(dgpu, "dashboard-machine-spec")
+        machine_specs.append(self.dashboard_cpu_model)
+        machine_specs.append(self.dashboard_gpu_model)
+        toolbar.append(machine_specs)
+        content.append(toolbar)
 
-        monitor = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        monitor_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        monitor_header.append(label("▰▰▰", "eyebrow"))
-        monitor_heading = label("Systems Monitor", "monitor-header")
-        monitor_heading.set_wrap(False)
-        monitor_header.append(monitor_heading)
-        monitor.append(monitor_header)
-        grid = Gtk.Grid(column_spacing=42, row_spacing=16, column_homogeneous=True)
-        monitor.append(grid)
-        self.mon = {}
+        main_grid = Gtk.Grid(column_spacing=9, row_spacing=9, column_homogeneous=True)
+        left_panel = self.dashboard_panel("CPU")
+        left_panel.set_size_request(340, 690)
+        self.cpu_temperature = None
+        self.cpu_gauge = Gtk.DrawingArea()
+        self.cpu_gauge.set_content_width(320)
+        self.cpu_gauge.set_content_height(380)
+        self.cpu_gauge.set_vexpand(True)
+        self.cpu_gauge.add_css_class("dashboard-cpu-gauge")
+        self.cpu_gauge.set_draw_func(self.draw_dashboard_gauge)
+        left_panel.append(self.cpu_gauge)
+        self.dashboard_gauge_value = label("— °C", "dashboard-gauge-value")
+        self.dashboard_gauge_value.set_halign(Gtk.Align.CENTER)
+        left_panel.append(self.dashboard_gauge_value)
+        cpu_usage_row, self.dashboard_cpu_usage, self.dashboard_cpu_usage_bar = self.dashboard_meter("CPU Usage")
+        gpu_usage_row, self.dashboard_gpu_usage, self.dashboard_gpu_usage_bar = self.dashboard_meter("GPU Usage")
+        left_panel.append(cpu_usage_row)
+        left_panel.append(gpu_usage_row)
+        left_modes = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        self.home_profile_buttons = {}
+        for name, short, _description in PROFILES:
+            mode_button = Gtk.Button(label=short)
+            mode_button.add_css_class("dashboard-mode-button")
+            mode_button.connect("clicked", self.on_profile_clicked, name)
+            left_modes.append(mode_button)
+            self.home_profile_buttons[name] = mode_button
+        left_panel.append(left_modes)
+        main_grid.attach(left_panel, 0, 0, 3, 5)
 
-        def monitor_block(icon_file, title, row, col, fallback_icon=None):
-            block = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
-            block.add_css_class("surface")
-            block.add_css_class("monitor-card")
-            head = Gtk.Box(spacing=8)
-            icon = asus_image(icon_file, fallback_icon, 18)
+        cards = Gtk.Grid(column_spacing=8, row_spacing=8, column_homogeneous=True)
+        self.dashboard_values = {}
+        self.dashboard_bars = {}
+
+        cpu_stats = self.dashboard_panel("CPU Stats")
+        self.dashboard_stat(cpu_stats, "Frequency", "—", "cpu_frequency")
+        self.dashboard_stat(cpu_stats, "Usage", "—", "cpu_usage")
+        self.dashboard_stat(cpu_stats, "Temperature", "—", "cpu_temperature")
+        cards.attach(cpu_stats, 0, 0, 1, 2)
+
+        gpu_stats = self.dashboard_panel("GPU Stats")
+        self.dashboard_stat(gpu_stats, "Temperature", "—", "gpu_temperature")
+        self.dashboard_stat(gpu_stats, "Usage", "Unavailable", "gpu_usage")
+        cards.attach(gpu_stats, 0, 2, 1, 2)
+
+        fans = self.dashboard_panel("Fan Speed")
+        cpu_fan_box = self.dashboard_metric_panel("CPU Fan", "ic_fan.svg", "cpu_fan")
+        gpu_fan_box = self.dashboard_metric_panel("GPU Fan", "ic_fan_alt.svg", "gpu_fan")
+        fans.append(cpu_fan_box)
+        fans.append(Gtk.Separator())
+        fans.append(gpu_fan_box)
+        cards.attach(fans, 1, 0, 1, 1)
+
+        config = self.dashboard_panel("System Configuration")
+        self.dashboard_stat(config, "BIOS", text("/sys/class/dmi/id/bios_version", "Unavailable"), "bios")
+        self.dashboard_stat(config, "Kernel", os.uname().release, "kernel")
+        self.dashboard_stat(config, "OS", os_pretty_name(), "os")
+        cards.attach(config, 1, 1, 1, 2)
+
+        shortcuts = self.dashboard_panel("App Configuration")
+        for title, page in (("Aura Sync", "lighting"), ("Battery Care", "battery"), ("GPU Mode", "gpu")):
+            shortcut = Gtk.Button(label=title)
+            shortcut.add_css_class("dashboard-quick-button")
+            shortcut.connect("clicked", self.on_dashboard_navigate, page)
+            shortcuts.append(shortcut)
+        cards.attach(shortcuts, 1, 3, 1, 1)
+
+        scenarios = self.dashboard_panel("Scenario Profiles")
+        self.dashboard_profile_values = {}
+        for name, _short, description in PROFILES:
+            button = Gtk.Button()
+            button.add_css_class("dashboard-profile-entry")
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+            row.append(label(PROFILE_SYMBOLS[name], "profile-symbol"))
+            profile_copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            profile_copy.append(label(name, "profile-name"))
+            profile_copy.append(label(description, "dashboard-tiny"))
+            row.append(profile_copy)
+            button.set_child(row)
+            button.connect("clicked", self.on_profile_clicked, name)
+            scenarios.append(button)
+            self.dashboard_profile_values[name] = button
+        cards.attach(scenarios, 2, 0, 1, 1)
+
+        battery = self.dashboard_panel("Battery Care")
+        self.dashboard_battery_value = label("—", "dashboard-value-large")
+        battery.append(self.dashboard_battery_value)
+        battery.append(label("Charge limit and battery status", "dashboard-tiny"))
+        battery_button = Gtk.Button(label="Open Battery")
+        battery_button.add_css_class("dashboard-quick-button")
+        battery_button.connect("clicked", self.on_dashboard_navigate, "battery")
+        battery.append(battery_button)
+        cards.attach(battery, 2, 1, 1, 1)
+
+        device = self.dashboard_panel("My Device")
+        self.dashboard_device_value = label(pretty_product_name(text("/sys/class/dmi/id/product_name", "ASUS laptop")), "dashboard-stat-value")
+        device.append(self.dashboard_device_value)
+        device.append(label(cpu_model(), "dashboard-tiny"))
+        device.append(label(dgpu, "dashboard-tiny"))
+        cards.attach(device, 2, 2, 1, 1)
+
+        gpu_mode = self.dashboard_panel("GPU Mode")
+        self.dashboard_gpu_mode_value = label("Unavailable", "dashboard-value-large")
+        gpu_mode.append(self.dashboard_gpu_mode_value)
+        gpu_mode_button = Gtk.Button(label="Open GPU Mode")
+        gpu_mode_button.add_css_class("dashboard-quick-button")
+        gpu_mode_button.connect("clicked", self.on_dashboard_navigate, "gpu")
+        gpu_mode.append(gpu_mode_button)
+        cards.attach(gpu_mode, 2, 3, 1, 1)
+
+        resources = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.dashboard_resource_values = {}
+        for key, title, icon_name in (("ram", "Memory", "ic_ram.svg"), ("storage", "Storage", "ic_ssd.svg"), ("ssd", "SSD", "ic_ssd.svg")):
+            panel = self.dashboard_panel(title)
+            icon = asus_image(icon_name, "drive-harddisk-symbolic", 20)
             if icon is not None:
-                icon.set_halign(Gtk.Align.START)
-                head.append(icon)
-            block_title = label({"CPU": "CPU", "GPU": "GPU", "FAN": "Fan", "STORAGE": "Storage"}[title], "monitor-panel-title")
-            block_title.set_wrap(False)
-            head.append(block_title)
-            block.append(head)
-            if title == "FAN":
-                self.fan_mon = {}
-                for key, metric_title in (("CPU_FAN", "CPU Fan"), ("GPU_FAN", "GPU Fan")):
-                    metric = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-                    metric_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-                    metric_row.append(label(metric_title, "subtle"))
-                    metric_value = label("—", "monitor-value")
-                    metric_value.set_hexpand(True)
-                    metric_value.set_halign(Gtk.Align.END)
-                    metric_row.append(metric_value)
-                    metric.append(metric_row)
-                    metric_bar = Gtk.LevelBar.new_for_interval(0, 100)
-                    metric_bar.set_mode(Gtk.LevelBarMode.CONTINUOUS)
-                    metric_bar.add_css_class("ac-level")
-                    metric.append(metric_bar)
-                    block.append(metric)
-                    self.fan_mon[key] = (metric_value, metric_bar)
-                grid.attach(block, col, row, 1, 1)
-                return
-            if title == "STORAGE":
-                self.storage_mon = {}
-                for key, metric_title in (("STORAGE", "Storage"), ("RAM", "RAM"), ("SSD", "SSD")):
-                    metric = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-                    metric_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-                    metric_row.append(label(metric_title, "subtle"))
-                    metric_value = label("—", "monitor-value")
-                    metric_value.set_hexpand(True)
-                    metric_value.set_halign(Gtk.Align.END)
-                    metric_value.set_ellipsize(2)
-                    metric_row.append(metric_value)
-                    metric.append(metric_row)
-                    metric_bar = Gtk.LevelBar.new_for_interval(0, 100)
-                    metric_bar.set_mode(Gtk.LevelBarMode.CONTINUOUS)
-                    metric_bar.add_css_class("ac-level")
-                    metric.append(metric_bar)
-                    block.append(metric)
-                    self.storage_mon[key] = (metric_value, metric_bar)
-                grid.attach(block, col, row, 1, 1)
-                return
-            value = label("—", "monitor-value")
+                panel.prepend(icon)
+            value = label("—", "dashboard-stat-value")
             value.set_wrap(False)
             value.set_ellipsize(2)
-            block.append(value)
+            panel.append(value)
             bar = Gtk.LevelBar.new_for_interval(0, 100)
-            bar.set_mode(Gtk.LevelBarMode.CONTINUOUS)
-            bar.add_css_class("ac-level")
-            block.append(bar)
-            grid.attach(block, col, row, 1, 1)
-            self.mon[title] = (value, bar)
-
-        monitor_block("ic_igpu.svg", "CPU", 0, 0)
-        monitor_block("ic_gpu.svg", "GPU", 0, 1)
-        monitor_block("ic_fan.svg", "FAN", 1, 0)
-        monitor_block("ic_ssd.svg", "STORAGE", 1, 1)
-        right_column.append(monitor)
-
-        right_column.append(label("OPERATING MODE", "eyebrow"))
-        self.home_profile_buttons = self.make_profile_cards(right_column, compact=True)
-
-        devices = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        devices.append(label("Devices (1)", "monitor-header"))
-        device_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        device_card.add_css_class("surface")
-        device_icon = asus_image("ic_laptop.svg", "computer-symbolic", 28)
-        if device_icon is not None:
-            device_card.append(device_icon)
-        device_card.append(label(pretty_product_name(text("/sys/class/dmi/id/product_name", "ASUS laptop")), "info-val"))
-        devices.append(device_card)
-        left_column.append(devices)
-
-        columns.append(left_column)
-        columns.append(right_column)
-        c.append(columns)
+            bar.add_css_class("dashboard-meter")
+            panel.append(bar)
+            self.dashboard_resource_values[key] = value
+            self.dashboard_bars[key] = bar
+            panel.set_hexpand(True)
+            resources.append(panel)
+        cards.attach(resources, 0, 4, 3, 1)
+        main_grid.attach(cards, 3, 0, 7, 5)
+        content.append(main_grid)
+        scroll.set_child(content)
+        outer.append(scroll)
         return outer
+
+    def dashboard_panel(self, title):
+        panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        panel.add_css_class("dashboard-module")
+        panel.append(label(title, "dashboard-module-title"))
+        return panel
+
+    def dashboard_stat(self, panel, title, initial, key):
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row.add_css_class("dashboard-stat-row")
+        row.append(label(title, "dashboard-stat-name"))
+        value = label(initial, "dashboard-stat-value")
+        value.set_hexpand(True)
+        value.set_halign(Gtk.Align.END)
+        value.set_ellipsize(2)
+        row.append(value)
+        panel.append(row)
+        self.dashboard_values[key] = value
+        return value
+
+    def dashboard_metric_panel(self, title, icon, key):
+        panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        panel.add_css_class("dashboard-module")
+        icon_image = asus_image(icon, "preferences-system-symbolic", 18)
+        if icon_image is not None:
+            panel.append(icon_image)
+        copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        copy.append(label(title, "dashboard-stat-name"))
+        value = label("— rpm", "dashboard-stat-value")
+        copy.append(value)
+        panel.append(copy)
+        self.dashboard_values[key] = value
+        return panel
+
+    def dashboard_meter(self, title):
+        row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        label_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        label_row.append(label(title, "dashboard-stat-name"))
+        value = label("—", "dashboard-stat-value")
+        value.set_hexpand(True)
+        value.set_halign(Gtk.Align.END)
+        label_row.append(value)
+        row.append(label_row)
+        bar = Gtk.LevelBar.new_for_interval(0, 100)
+        bar.add_css_class("dashboard-meter")
+        row.append(bar)
+        return row, value, bar
+
+    def draw_dashboard_gauge(self, _area, context, width, height):
+        center_x = width / 2
+        center_y = height * 0.50
+        radius = min(width * 0.43, height * 0.45)
+        value = max(0.0, min(100.0, self.cpu_temperature or 0.0))
+        start_angle = math.radians(135)
+        sweep = math.radians(270)
+        end_angle = start_angle + sweep
+
+        context.set_source_rgba(0.01, 0.025, 0.04, 0.7)
+        context.arc(center_x, center_y, radius * 1.04, 0, math.tau)
+        context.fill()
+        for ring_radius, opacity, line_width in ((radius, .45, 1), (radius * .91, .18, 1), (radius * .73, .35, 2)):
+            context.set_source_rgba(.48, .72, .87, opacity)
+            context.set_line_width(line_width)
+            context.arc(center_x, center_y, ring_radius, 0, math.tau)
+            context.stroke()
+
+        context.set_line_width(max(3, radius * .022))
+        context.set_line_cap(1)
+        context.set_source_rgba(.10, .26, .37, .9)
+        context.arc(center_x, center_y, radius * .83, start_angle, end_angle)
+        context.stroke()
+        context.set_source_rgba(.97, .13, .34, .98)
+        context.arc(center_x, center_y, radius * .83, start_angle, start_angle + sweep * value / 100)
+        context.stroke()
+        context.set_line_width(max(2, radius * .012))
+        context.set_source_rgba(.12, .62, .92, .85)
+        context.arc(center_x, center_y, radius * .69, start_angle, end_angle)
+        context.stroke()
+
+        context.select_font_face("Cantarell", 0, 1)
+        for tick in range(41):
+            angle = start_angle + sweep * tick / 40
+            major = tick % 5 == 0
+            inner_radius = radius * (.91 if major else .945)
+            context.set_line_width(2 if major else 1)
+            context.set_source_rgba(.82, .89, .96, .92 if major else .55)
+            context.move_to(center_x + inner_radius * math.cos(angle), center_y + inner_radius * math.sin(angle))
+            context.line_to(center_x + radius * .97 * math.cos(angle), center_y + radius * .97 * math.sin(angle))
+            context.stroke()
+            if major:
+                context.set_font_size(max(9, radius * .065))
+                context.move_to(center_x + radius * .79 * math.cos(angle) - 6, center_y + radius * .79 * math.sin(angle) + 4)
+                context.show_text(str(round(tick * 2.5 / 10)))
+
+        needle_angle = start_angle + sweep * value / 100
+        context.set_line_width(max(2, radius * .012))
+        context.set_source_rgba(.9, .96, 1, .95)
+        context.move_to(center_x, center_y)
+        context.line_to(center_x + radius * .70 * math.cos(needle_angle), center_y + radius * .70 * math.sin(needle_angle))
+        context.stroke()
+        context.set_source_rgba(.94, .97, 1, .95)
+        context.arc(center_x, center_y, radius * .045, 0, math.tau)
+        context.fill()
+        context.set_source_rgba(.8, .88, .95, .9)
+        context.set_font_size(max(11, radius * .08))
+        context.move_to(center_x - radius * .08, center_y + radius * .32)
+        context.show_text("CPU")
+
+    def on_dashboard_navigate(self, _button, page):
+        self.nav_buttons[page].set_active(True)
+
+    def build_device(self):
+        outer, content = self.page_shell("DEVICE", "System Information", "Live details reported by Linux and the ASUS firmware.")
+        panel = self.dashboard_panel("Hardware")
+        details = (
+            ("Model", pretty_product_name(text("/sys/class/dmi/id/product_name", "ASUS laptop"))),
+            ("BIOS", text("/sys/class/dmi/id/bios_version", "Unavailable")),
+            ("Operating System", os_pretty_name()),
+            ("Kernel", os.uname().release),
+            ("CPU", cpu_model()),
+            ("GPU", " · ".join(gpu_names())),
+            ("Memory", self.memory_summary()),
+            ("Storage", self.disk_summary()),
+        )
+        for title, value in details:
+            self.dashboard_stat(panel, title, value, f"device_{title}")
+        content.append(panel)
+        return outer
+
+    def memory_summary(self):
+        total, available = read_memory()
+        if total is None or available is None:
+            return "Unavailable"
+        used = total - available
+        return f"{total / 1048576:.1f} GB · {used / 1048576:.1f} GB in use"
+
+    def disk_summary(self):
+        disks = read_disks()
+        return " | ".join(disks) if disks else "Unavailable"
 
     def make_profile_cards(self, parent, compact=False):
         row = Gtk.Box(spacing=10)
@@ -707,74 +1059,245 @@ class ArmouryWindow(Gtk.ApplicationWindow):
         return outer
 
     def build_lighting(self):
-        outer, c = self.page_shell("PERSONALIZATION", "Keyboard Lighting", "Pick an effect and tailor its colours, speed, and direction. Applied via the asusctl service.")
+        outer, c = self.page_shell(
+            "PERSONALIZATION",
+            "Keyboard Lighting",
+            "Choose an Aura effect, set its colors, and adjust the keyboard backlight.",
+        )
         effect_group = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         effect_group.add_css_class("surface")
         effect_group.append(label("LIGHTING EFFECT", "surface-title"))
-        self.effect_list = Gtk.StringList.new(list(EFFECT_OPTIONS))
-        self.effect_dropdown = Gtk.DropDown(model=self.effect_list)
+        self.effect_dropdown = Gtk.DropDown(
+            model=Gtk.StringList.new([EFFECT_LABELS[name] for name in EFFECT_OPTIONS])
+        )
+        self.effect_dropdown.set_hexpand(True)
         effect_group.append(self.effect_dropdown)
+        self.effect_description = label("", "lighting-description")
+        effect_group.append(self.effect_description)
 
-        def option_row(title_text):
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-            key = label(title_text.upper(), "opt-key")
-            key.set_size_request(150, -1)
-            key.set_valign(Gtk.Align.CENTER)
-            row.append(key)
-            effect_group.append(row)
-            return row
-
-        self.colour1_row = option_row("Primary colour")
-        self.colour2_row = option_row("Secondary colour")
-        self.speed_row = option_row("Speed")
-        self.direction_row = option_row("Direction")
-
-        if hasattr(Gtk, "ColorDialogButton"):
-            self.use_colour_dialog = True
-            self.colour1 = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog())
-            self.colour1.set_rgba(make_rgba(AURA_DEFAULT_COLOUR))
-            self.colour2 = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog())
-            self.colour2.set_rgba(make_rgba("101820"))
-        else:
-            self.use_colour_dialog = False
-            self.colour1 = Gtk.DropDown(model=Gtk.StringList.new(list(AURA_PRESETS)))
-            self.colour2 = Gtk.DropDown(model=Gtk.StringList.new(list(AURA_PRESETS) + ["Dark"]))
-            self.colour1.set_selected(0)
-        for w in (self.colour1, self.colour2):
-            w.add_css_class("swatch")
-        self.colour1_row.append(self.colour1)
-        self.colour2_row.append(self.colour2)
-
-        self.speed_dropdown = Gtk.DropDown(model=Gtk.StringList.new(AURA_SPEEDS))
+        options = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
+        self.speed_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.speed_row.append(label("SPEED", "opt-key"))
+        self.speed_dropdown = Gtk.DropDown(
+            model=Gtk.StringList.new(AURA_SPEED_LABELS)
+        )
         self.speed_dropdown.set_selected(1)
         self.speed_row.append(self.speed_dropdown)
-        self.direction_dropdown = Gtk.DropDown(model=Gtk.StringList.new(AURA_DIRECTIONS))
+        options.append(self.speed_row)
+
+        self.direction_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.direction_row.append(label("DIRECTION", "opt-key"))
+        self.direction_dropdown = Gtk.DropDown(
+            model=Gtk.StringList.new(AURA_DIRECTION_LABELS)
+        )
         self.direction_dropdown.set_selected(2)
         self.direction_row.append(self.direction_dropdown)
-        self.effect_dropdown.connect("notify::selected", self.on_effect_selected)
-        self.on_effect_selected(self.effect_dropdown, None)
+        options.append(self.direction_row)
+        effect_group.append(options)
 
-        apply = Gtk.Button(label="Apply effect")
-        apply.add_css_class("accent-button")
-        apply.set_halign(Gtk.Align.START)
-        apply.connect("clicked", self.on_apply_effect)
-        effect_group.append(apply)
+        self.apply_effect_button = Gtk.Button(label="Apply lighting effect")
+        self.apply_effect_button.add_css_class("accent-button")
+        self.apply_effect_button.set_halign(Gtk.Align.START)
+        self.apply_effect_button.connect("clicked", self.on_apply_effect)
+        effect_group.append(self.apply_effect_button)
         c.append(effect_group)
+
+        colour_section = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        self.colour_controls = {}
+        self.primary_colour_group = self.build_colour_control(
+            "PRIMARY COLOR", "primary", AURA_DEFAULT_COLOUR
+        )
+        self.secondary_colour_group = self.build_colour_control(
+            "SECONDARY COLOR", "secondary", "1769ff"
+        )
+        self.primary_colour_group.set_hexpand(True)
+        self.secondary_colour_group.set_hexpand(True)
+        colour_section.append(self.primary_colour_group)
+        colour_section.append(self.secondary_colour_group)
+        c.append(colour_section)
+
         brightness_group = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         brightness_group.add_css_class("surface")
-        brightness_group.append(label("BACKLIGHT BRIGHTNESS", "surface-title"))
-        brightness_group.append(label("This laptop exposes a single-zone keyboard backlight (four brightness levels). Per-key RGB is not available on this firmware.", "subtle"))
-        self.brightness_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 3, 1)
-        self.brightness_scale.add_css_class("ac-slider")
-        self.brightness_scale.set_digits(0)
-        self.brightness_scale.set_draw_value(True)
-        brightness_group.append(self.brightness_scale)
+        brightness_group.append(label("KEYBOARD BACKLIGHT", "surface-title"))
+        brightness_group.append(label(
+            "This firmware exposes four single-zone brightness levels; per-key RGB is not available.",
+            "subtle",
+        ))
+        self.brightness_dirty = False
+        self.syncing_brightness = True
+        brightness_options = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.brightness_buttons = []
+        previous = None
+        for index, title in enumerate(("Off", "Low", "Medium", "High")):
+            button = Gtk.ToggleButton(label=title)
+            button.add_css_class("brightness-option")
+            if previous is not None:
+                button.set_group(previous)
+            else:
+                previous = button
+            button.set_tooltip_text(f"Set keyboard backlight to {title.lower()}")
+            button.connect("toggled", self.on_brightness_option_toggled, index)
+            self.brightness_buttons.append(button)
+            brightness_options.append(button)
+        brightness_group.append(brightness_options)
+        self.brightness_feedback = label("", "subtle")
+        brightness_group.append(self.brightness_feedback)
+        self.brightness_buttons[0].set_active(True)
+        self.syncing_brightness = False
         apply_brightness = Gtk.Button(label="Apply brightness")
+        apply_brightness.add_css_class("accent-button")
         apply_brightness.set_halign(Gtk.Align.START)
         apply_brightness.connect("clicked", self.on_apply_brightness)
         brightness_group.append(apply_brightness)
         c.append(brightness_group)
+
+        self.effect_dropdown.connect("notify::selected", self.on_effect_selected)
+        self.on_effect_selected(self.effect_dropdown, None)
         return outer
+
+    def build_colour_control(self, title, slot, initial_colour):
+        group = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        group.add_css_class("surface")
+        group.append(label(title, "surface-title"))
+
+        palette_grid = Gtk.Grid(column_spacing=5, row_spacing=5)
+        palette_grid.add_css_class("color-palette")
+        control = {
+            "hex": initial_colour.lower(),
+            "valid": True,
+            "entry": None,
+            "picker": None,
+            "preview": None,
+            "buttons": [],
+        }
+        self.colour_controls[slot] = control
+        for index, (name, colour) in enumerate(AURA_PRESETS.items()):
+            button = Gtk.Button()
+            button.add_css_class("color-swatch")
+            button.set_tooltip_text(f"{name} · #{colour.upper()}")
+            chip = Gtk.DrawingArea()
+            chip.add_css_class("color-chip")
+            chip.set_content_width(22)
+            chip.set_content_height(22)
+            chip.set_draw_func(self.draw_colour_chip, colour)
+            button.set_child(chip)
+            button.connect("clicked", self.on_colour_preset_clicked, slot, colour)
+            palette_grid.attach(button, index % 6, index // 6, 1, 1)
+            control["buttons"].append((colour, button))
+        group.append(palette_grid)
+        group.append(Gtk.Separator())
+
+        custom_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+        custom_row.append(label("HEX", "opt-key"))
+        picker = None
+        initial_rgba = make_rgba(initial_colour)
+        if hasattr(Gtk, "ColorDialogButton"):
+            picker = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog())
+            picker.set_rgba(initial_rgba)
+            picker.connect("notify::rgba", self.on_colour_picker_changed, slot)
+            picker.set_tooltip_text("Open the color picker")
+        elif hasattr(Gtk, "ColorButton"):
+            picker = Gtk.ColorButton.new_with_rgba(initial_rgba)
+            picker.connect("color-set", self.on_colour_picker_changed, slot)
+            picker.set_tooltip_text("Open the color picker")
+        if picker is not None:
+            picker.add_css_class("color-picker-button")
+            control["picker"] = picker
+            custom_row.append(picker)
+
+        entry = Gtk.Entry()
+        entry.add_css_class("hex-entry")
+        entry.set_width_chars(8)
+        entry.set_max_length(7)
+        entry.set_input_purpose(Gtk.InputPurpose.FREE_FORM)
+        entry.set_placeholder_text("#RRGGBB")
+        entry.set_text("#" + initial_colour.upper())
+        entry.connect("changed", self.on_colour_entry_changed, slot)
+        control["entry"] = entry
+        custom_row.append(entry)
+
+        preview = Gtk.DrawingArea()
+        preview.add_css_class("color-chip")
+        preview.set_content_width(28)
+        preview.set_content_height(28)
+        preview.set_draw_func(self.draw_colour_chip, initial_colour)
+        control["preview"] = preview
+        custom_row.append(preview)
+        custom_row.set_hexpand(True)
+        group.append(custom_row)
+        self.set_colour_value(slot, initial_colour, update_picker=False)
+        return group
+
+    def draw_colour_chip(self, _area, context, width, height, hex_colour):
+        colour = hex_colour.lstrip("#")
+        red, green, blue = (int(colour[offset:offset + 2], 16) / 255 for offset in (0, 2, 4))
+        radius = max(1, min(width, height) * 0.39)
+        context.arc(width / 2, height / 2, radius, 0, 6.283185307179586)
+        context.set_source_rgb(red, green, blue)
+        context.fill_preserve()
+        context.set_line_width(1.3)
+        context.set_source_rgba(1, 1, 1, 0.72)
+        context.stroke()
+
+    def set_colour_value(self, slot, colour, update_entry=True, update_picker=True):
+        colour = colour.lower().lstrip("#")
+        control = self.colour_controls[slot]
+        control["hex"] = colour
+        control["valid"] = True
+        self.syncing_colours = True
+        try:
+            if update_entry and control["entry"].get_text() != "#" + colour.upper():
+                control["entry"].set_text("#" + colour.upper())
+            control["entry"].remove_css_class("invalid")
+            if update_picker and control["picker"] is not None:
+                rgba = make_rgba(colour)
+                if rgba is not None:
+                    control["picker"].set_rgba(rgba)
+            control["preview"].set_draw_func(self.draw_colour_chip, colour)
+            control["preview"].queue_draw()
+            for preset_colour, button in control["buttons"]:
+                if preset_colour == colour:
+                    button.add_css_class("selected")
+                else:
+                    button.remove_css_class("selected")
+        finally:
+            self.syncing_colours = False
+
+    def on_colour_preset_clicked(self, _button, slot, colour):
+        self.set_colour_value(slot, colour)
+
+    def on_colour_picker_changed(self, widget, parameter, slot=None):
+        slot = parameter if slot is None else slot
+        if self.syncing_colours:
+            return
+        self.set_colour_value(slot, rgba_hex(widget.get_rgba()), update_picker=False)
+
+    def on_colour_entry_changed(self, entry, slot):
+        if self.syncing_colours:
+            return
+        colour = entry.get_text().strip().lstrip("#")
+        if len(colour) != 6 or any(char not in "0123456789abcdefABCDEF" for char in colour):
+            self.colour_controls[slot]["valid"] = False
+            entry.add_css_class("invalid")
+            return
+        rgba = make_rgba(colour)
+        if rgba is None:
+            self.colour_controls[slot]["valid"] = False
+            entry.add_css_class("invalid")
+            return
+        self.set_colour_value(slot, colour, update_entry=False)
+
+    def on_brightness_option_toggled(self, button, index):
+        if button.get_active():
+            button.add_css_class("active")
+        else:
+            button.remove_css_class("active")
+        if button.get_active() and not self.syncing_brightness:
+            self.brightness_dirty = True
+            titles = ("off", "low", "medium", "high")
+            self.brightness_feedback.set_text(
+                f"Selected {titles[index]} · press Apply to save."
+            )
 
     def build_gpu(self):
         outer, c = self.page_shell("GRAPHICS", "GPU Mode", "Switch between integrated graphics and hybrid graphics. The change takes effect after logout or reboot.")
@@ -808,6 +1331,11 @@ class ArmouryWindow(Gtk.ApplicationWindow):
                     button.add_css_class("active")
                 else:
                     button.remove_css_class("active")
+        for name, button in getattr(self, "dashboard_profile_values", {}).items():
+            if name == active:
+                button.add_css_class("active")
+            else:
+                button.remove_css_class("active")
 
     def refresh(self):
         profile = read_profile()
@@ -832,44 +1360,59 @@ class ArmouryWindow(Gtk.ApplicationWindow):
         gpu = fan_read(hwmon, "fan2_input")
         self.cpu_fan_value.set_text(rpm(cpu))
         self.gpu_fan_value.set_text(rpm(gpu))
-        if hasattr(self, "mon"):
+        if hasattr(self, "dashboard_values"):
             cpu_temp = read_thermal("acpitz")
             gpu_temp = read_thermal("amdgpu")
             freq = cpu_freq_ghz()
             total_gb, free_gb, used_pct = disk_usage()
-            cpu_val, cpu_bar = self.mon["CPU"]
-            cpu_val.set_text(f"{cpu_temp:.0f} °C · {freq:.1f} GHz" if cpu_temp is not None else f"{freq:.1f} GHz")
-            cpu_bar.set_value(min(100.0, cpu_temp or 0))
-            gpu_val, gpu_bar = self.mon["GPU"]
-            gpu_val.set_text(f"{gpu_temp:.0f} °C" if gpu_temp is not None else "—")
-            gpu_bar.set_value(min(100.0, gpu_temp or 0))
-            for key, speed in (("CPU_FAN", cpu), ("GPU_FAN", gpu)):
-                fan_value, fan_bar = self.fan_mon[key]
-                fan_value.set_text(rpm(speed))
-                fan_bar.set_value(min(100.0, (speed or 0) / 60.0))
-            storage_value, storage_bar = self.storage_mon["STORAGE"]
-            storage_value.set_text(f"{free_gb:.0f} GB free · {used_pct:.0f}% used")
-            storage_bar.set_value(used_pct)
+            cpu_usage = cpu_usage_percent()
+            gpu_usage = gpu_usage_percent()
+            self.cpu_temperature = cpu_temp
+            self.cpu_gauge.queue_draw()
+            self.dashboard_gauge_value.set_text(f"{cpu_temp:.0f} °C" if cpu_temp is not None else "— °C")
+            self.dashboard_values["cpu_frequency"].set_text(f"{freq * 1000:.0f} MHz" if freq else "Unavailable")
+            self.dashboard_values["cpu_usage"].set_text(f"{cpu_usage:.0f}%" if cpu_usage is not None else "Sampling…")
+            self.dashboard_values["cpu_temperature"].set_text(f"{cpu_temp:.0f} °C" if cpu_temp is not None else "Unavailable")
+            self.dashboard_cpu_usage.set_text(f"{cpu_usage:.0f}%" if cpu_usage is not None else "Sampling…")
+            self.dashboard_cpu_usage_bar.set_value(cpu_usage or 0)
+            self.dashboard_values["gpu_temperature"].set_text(f"{gpu_temp:.0f} °C" if gpu_temp is not None else "Unavailable")
+            self.dashboard_values["gpu_usage"].set_text(f"{gpu_usage:.0f}%" if gpu_usage is not None else "Unavailable")
+            self.dashboard_gpu_usage.set_text(f"{gpu_usage:.0f}%" if gpu_usage is not None else "Unavailable")
+            self.dashboard_gpu_usage_bar.set_value(gpu_usage or 0)
+            for key, speed in (("cpu_fan", cpu), ("gpu_fan", gpu)):
+                self.dashboard_values[key].set_text(rpm(speed))
+            self.dashboard_resource_values["storage"].set_text(f"{free_gb:.0f} GB free · {used_pct:.0f}% used")
+            self.dashboard_bars["storage"].set_value(used_pct)
             memory_total, memory_available = read_memory()
             if memory_total is not None and memory_available is not None:
                 memory_used = memory_total - memory_available
-                memory_value, memory_bar = self.storage_mon["RAM"]
                 memory_percent = memory_used / memory_total * 100 if memory_total else 0
-                memory_value.set_text(f"{memory_used / 1048576:.1f} / {memory_total / 1048576:.1f} GB")
-                memory_bar.set_value(memory_percent)
-            ssd_value, ssd_bar = self.storage_mon["SSD"]
+                self.dashboard_resource_values["ram"].set_text(f"{memory_used / 1048576:.1f} / {memory_total / 1048576:.1f} GB")
+                self.dashboard_bars["ram"].set_value(memory_percent)
             disk_models = read_disks()
-            ssd_value.set_text(" · ".join(disk_models) if disk_models else "Unavailable")
-            ssd_bar.set_value(used_pct)
+            self.dashboard_resource_values["ssd"].set_text(" · ".join(disk_models) if disk_models else "Unavailable")
+            self.dashboard_bars["ssd"].set_value(used_pct)
+            self.dashboard_battery_value.set_text(f"{level}%" if (level := int_or_none(text("/sys/class/power_supply/BAT1/capacity", ""))) is not None else "—")
         level = int_or_none(text("/sys/class/power_supply/BAT1/capacity", ""))
         status = text("/sys/class/power_supply/BAT1/status", "Battery status unavailable")
         self.battery_level_value.set_text(f"{level}%" if level is not None else "—")
         self.battery_level_card.get_last_child().set_text(status)
         brightness = int_or_none(text("/sys/class/leds/asus::kbd_backlight/brightness", ""))
-        if brightness is not None:
-            self.brightness_scale.set_value(brightness)
+        if brightness is not None and 0 <= brightness < len(self.brightness_buttons):
+            if not self.brightness_dirty:
+                self.syncing_brightness = True
+                for index, button in enumerate(self.brightness_buttons):
+                    button.set_active(index == brightness)
+                self.syncing_brightness = False
+            if not self.brightness_dirty:
+                brightness_label = ("Off", "Low", "Medium", "High")[brightness]
+                self.brightness_feedback.set_text(
+                    f"Current keyboard backlight: {brightness_label}."
+                )
         gpu_mode = command(["supergfxctl", "-g"])
         self.gpu_current_value.set_text(gpu_mode.stdout.strip() if gpu_mode.returncode == 0 else "Unavailable")
+        if hasattr(self, "dashboard_gpu_mode_value"):
+            self.dashboard_gpu_mode_value.set_text(gpu_mode.stdout.strip() if gpu_mode.returncode == 0 else "Unavailable")
         current_mode = gpu_mode.stdout.strip() if gpu_mode.returncode == 0 else None
         if current_mode in GPU_MODES:
             self.gpu_dropdown.set_selected(GPU_MODES.index(current_mode))
@@ -970,19 +1513,16 @@ class ArmouryWindow(Gtk.ApplicationWindow):
 
     def on_effect_selected(self, _dropdown, _pspec):
         names = list(EFFECT_OPTIONS)
-        spec = EFFECT_OPTIONS[names[self.effect_dropdown.get_selected()]]
-        self.colour1_row.set_visible(spec.get("colours", 0) >= 1)
-        self.colour2_row.set_visible(spec.get("colours", 0) >= 2)
+        index = self.effect_dropdown.get_selected()
+        if index >= len(names):
+            return
+        effect = names[index]
+        spec = EFFECT_OPTIONS[effect]
+        self.primary_colour_group.set_visible(spec.get("colours", 0) >= 1)
+        self.secondary_colour_group.set_visible(spec.get("colours", 0) >= 2)
         self.speed_row.set_visible(bool(spec.get("speed")))
         self.direction_row.set_visible(bool(spec.get("direction")))
-
-    def selected_colour(self, widget, name_of_dark="101820"):
-        if self.use_colour_dialog:
-            return rgba_hex(widget.get_rgba())
-        preset = list(AURA_PRESETS)[widget.get_selected()]
-        if preset == "Dark":
-            return name_of_dark
-        return AURA_PRESETS[preset]
+        self.effect_description.set_text(EFFECT_DESCRIPTIONS[effect])
 
     def on_apply_effect(self, _button):
         names = list(EFFECT_OPTIONS)
@@ -991,29 +1531,48 @@ class ArmouryWindow(Gtk.ApplicationWindow):
             return
         effect = names[idx]
         spec = EFFECT_OPTIONS[effect]
+        required_colours = ["primary"] if spec.get("colours", 0) >= 1 else []
+        if spec.get("colours", 0) >= 2:
+            required_colours.append("secondary")
+        if any(not self.colour_controls[slot]["valid"] for slot in required_colours):
+            self.toast("Enter a valid color as six hexadecimal digits, like #FF2050.")
+            return
         args = ["asusctl", "aura", "effect", effect]
         if spec.get("colours", 0) >= 1:
-            args += ["--colour", self.selected_colour(self.colour1, AURA_DEFAULT_COLOUR)]
+            args += ["--colour", self.colour_controls["primary"]["hex"]]
         if spec.get("colours", 0) >= 2:
-            args += ["--colour2", self.selected_colour(self.colour2)]
+            args += ["--colour2", self.colour_controls["secondary"]["hex"]]
         if spec.get("speed"):
-            args += ["--speed", AURA_SPEEDS[self.speed_dropdown.get_selected()]]
+            speed = self.speed_dropdown.get_selected()
+            if speed >= len(AURA_SPEEDS):
+                return
+            args += ["--speed", AURA_SPEEDS[speed]]
         if spec.get("direction"):
-            args += ["--direction", AURA_DIRECTIONS[self.direction_dropdown.get_selected()]]
+            direction = self.direction_dropdown.get_selected()
+            if direction >= len(AURA_DIRECTIONS):
+                return
+            args += ["--direction", AURA_DIRECTIONS[direction]]
         result = command(args)
         if result.returncode == 0:
-            self.toast(f"Keyboard effect set to {effect}")
+            self.toast(f"Keyboard effect set to {EFFECT_LABELS[effect]}")
         else:
             self.toast("Could not apply effect: " + ((result.stderr or result.stdout).strip() or "asusctl error"))
 
     def on_apply_brightness(self, _button):
-        value = round(self.brightness_scale.get_value())
-        level = {0: "off", 1: "low", 2: "med", 3: "high"}.get(value)
-        if level is None:
+        value = next(
+            (index for index, button in enumerate(self.brightness_buttons) if button.get_active()),
+            None,
+        )
+        levels = ("off", "low", "med", "high")
+        if value is None:
             return
+        level = levels[value]
         result = command(["asusctl", "leds", "set", level])
         if result.returncode == 0:
+            self.brightness_dirty = False
+            self.brightness_feedback.set_text(f"Keyboard backlight set to {level}.")
             self.toast(f"Keyboard backlight set to {level}")
+            self.refresh()
         else:
             self.toast("Could not set backlight: " + ((result.stderr or result.stdout).strip() or "asusctl error"))
 

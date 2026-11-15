@@ -80,7 +80,9 @@ class DevicePage:
         self.device_tab_buttons["monitor"].set_active(True)
         self.on_device_level_changed(self.device_level_dropdown, None)
         self.refresh_device_monitor()
-        GLib.timeout_add_seconds(max(1, round(DEVICE_MONITOR_REFRESH_SECONDS)), self.refresh_device_monitor)
+        self.device_timer_id = GLib.timeout_add_seconds(
+            max(1, round(DEVICE_MONITOR_REFRESH_SECONDS)), self.refresh_device_monitor
+        )
         return outer
 
     def _build_resource_monitor(self):

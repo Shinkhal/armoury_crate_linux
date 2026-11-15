@@ -2,6 +2,7 @@
 import glob
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from hardware.asus import command, int_or_none, text
 
@@ -9,7 +10,27 @@ _cpu_times = None
 _gpu_names = None
 _nvidia_gpu_cache = None
 _nvidia_gpu_cache_time = 0.0
+_nvidia_gpu_future = None
+_nvidia_gpu_last_started = 0.0
+_nvidia_gpu_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nvidia-telemetry")
 _NVIDIA_GPU_CACHE_TTL = 8.0
+
+
+def _query_nvidia_gpu():
+    return command([
+        "nvidia-smi",
+        "--query-gpu=utilization.gpu,temperature.gpu,clocks.gr,memory.used,memory.total",
+        "--format=csv,noheader,nounits",
+    ], timeout=2)
+
+
+def shutdown_telemetry():
+    """Stop background telemetry work during application shutdown."""
+    global _nvidia_gpu_future
+    if _nvidia_gpu_future is not None and not _nvidia_gpu_future.done():
+        _nvidia_gpu_future.cancel()
+    _nvidia_gpu_future = None
+    _nvidia_gpu_executor.shutdown(wait=False, cancel_futures=True)
 
 
 def read_memory():
@@ -176,6 +197,7 @@ def gpu_usage_percent():
 def gpu_telemetry():
     """Read available GPU sensors from NVIDIA tooling or Linux DRM sysfs."""
     global _nvidia_gpu_cache, _nvidia_gpu_cache_time
+    global _nvidia_gpu_future, _nvidia_gpu_last_started
     result = {
         "usage": gpu_usage_percent(),
         "temperature": read_thermal("amdgpu") or read_thermal("nvidia"),
@@ -199,13 +221,13 @@ def gpu_telemetry():
             result["memory_used"], result["memory_total"] = used, total
 
     now = time.monotonic()
-    if _nvidia_gpu_cache is None or now - _nvidia_gpu_cache_time >= 4:
-        nvidia = command([
-            "nvidia-smi",
-            "--query-gpu=utilization.gpu,temperature.gpu,clocks.gr,memory.used,memory.total",
-            "--format=csv,noheader,nounits",
-        ], timeout=2)
-        if nvidia.returncode == 0 and nvidia.stdout.strip():
+    if _nvidia_gpu_future is not None and _nvidia_gpu_future.done():
+        try:
+            nvidia = _nvidia_gpu_future.result()
+        except Exception:
+            nvidia = None
+        _nvidia_gpu_future = None
+        if nvidia is not None and nvidia.returncode == 0 and nvidia.stdout.strip():
             fields = [part.strip() for part in nvidia.stdout.splitlines()[0].split(",")]
             try:
                 if len(fields) >= 5:
@@ -219,6 +241,9 @@ def gpu_telemetry():
                     _nvidia_gpu_cache_time = now
             except ValueError:
                 pass
+    if _nvidia_gpu_future is None and now - _nvidia_gpu_last_started >= 4:
+        _nvidia_gpu_last_started = now
+        _nvidia_gpu_future = _nvidia_gpu_executor.submit(_query_nvidia_gpu)
     # Never let a successful old sample mask unavailable hardware forever.
     # Keep the short query cache above, but expire it even when nvidia-smi
     # disappears or starts failing. Sysfs readings collected above remain a

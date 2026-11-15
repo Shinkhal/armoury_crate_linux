@@ -35,6 +35,9 @@ install -Dpm 0644 %{_sourcedir}/armoury-crate.svg %{buildroot}%{_datadir}/icons/
 %{_datadir}/icons/hicolor/scalable/apps/armoury-crate.svg
 
 %changelog
+* Sun Nov 15 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.6-1
+- Move NVIDIA telemetry off the GTK thread and add capability and regression checks
+
 * Sun Nov 15 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.5-1
 - Stabilize telemetry, fan detection, packaging, and release validation
 

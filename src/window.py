@@ -21,6 +21,7 @@ from hardware.system import (
     cpu_freq_ghz, cpu_model, cpu_usage_percent, disk_usage, gpu_names,
     gpu_usage_percent, os_pretty_name, pretty_product_name, read_disks,
     read_battery_state, read_memory, read_thermal, text,
+    shutdown_telemetry,
 )
 from styles import CSS
 from pages.dashboard import DashboardPage
@@ -84,6 +85,16 @@ class ArmouryWindow(
             max(1, round(TELEMETRY_REFRESH_SECONDS)), self.refresh_timer
         )
         self.refresh()
+
+    def do_close_request(self):
+        """Cancel periodic callbacks before GTK tears down the window."""
+        for attribute in ("telemetry_timer_id", "device_timer_id"):
+            source_id = getattr(self, attribute, None)
+            if source_id:
+                GLib.source_remove(source_id)
+                setattr(self, attribute, None)
+        shutdown_telemetry()
+        return False
 
     def add_page(self, name, title, icon_file, fallback_icon, builder):
         button = Gtk.ToggleButton()

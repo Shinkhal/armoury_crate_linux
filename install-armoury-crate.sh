@@ -67,7 +67,7 @@ install_files() {
 
 uninstall_files() {
     rm -f "$BIN_DST" "$DESKTOP_DST" "$APP_ICON_DST" "$ICON_DST" "$LEGACY_BIN_DST" "$LEGACY_DESKTOP_DST" "$LEGACY_ICON_DST"
-    rm -rf "$PACKAGE_DST/src"
+    rm -rf "$PACKAGE_DST"
     echo "Removed from ~/.local"
 }
 

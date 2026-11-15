@@ -34,6 +34,9 @@ install -Dpm 0644 %{_sourcedir}/armoury-crate.svg %{buildroot}%{_datadir}/icons/
 %{_datadir}/icons/hicolor/scalable/apps/armoury-crate.svg
 
 %changelog
+* Sun Nov 15 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.4-1
+- Add cross-distribution install and uninstall scripts with dependency checks
+
 * Sun Nov 15 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.3-1
 - Add live device resource monitoring and running application usage
 - Improve dashboard, keyboard lighting controls, and profile switching

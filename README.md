@@ -23,7 +23,7 @@ See [the monitoring and hardware support guide](docs/monitoring-and-controls.md)
 - `src/config.py` and `src/styles.py` hold app settings and shared GTK styling.
 - `assets/` contains optional artwork and UI icons.
 - `packaging/` contains RPM and DEB build definitions.
-- `install-armoury-crate.sh` installs the launcher, source modules, and assets for the current user.
+- `install.sh` checks ASUS hardware compatibility and runtime dependencies, offers to install missing packages from configured distribution repositories, then installs the app for the current user. `uninstall.sh` removes the app files without removing system dependencies.
 
 Hardware support varies by laptop and firmware. Unsupported controls are not emulated: this app does not provide custom fan curves or per-key RGB where the firmware exposes no Linux interface.
 
@@ -36,16 +36,18 @@ Hardware support varies by laptop and firmware. Unsupported controls are not emu
 - `nvidia-smi` is optional and used for NVIDIA telemetry when available; AMD/Linux DRM sysfs sensors are used where exposed.
 - An ASUS laptop with the corresponding kernel/firmware interfaces.
 
-Install those runtime dependencies using your distribution's package manager, then run:
+Run the installer from the downloaded or cloned project directory:
 
 ```sh
-./install-armoury-crate.sh install
+./install.sh
 ```
 
-The installer places the app in the current user's `~/.local` directories. To remove it:
+The installer checks for `asusctl`, `supergfxctl`, GTK 4, libadwaita, PyGObject, `pciutils`, and `procps`. It supports APT, DNF/YUM, Pacman, Zypper, APK, XBPS, Emerge, and Eopkg based distributions. It asks before installing missing packages and uses `sudo` for system package operations. On Fedora it offers the Terra repository; on Arch it offers the signed OGC repository. Other distributions need the ASUS utility packages available in their configured repositories. NixOS needs its declarative service configuration, so the installer reports that requirement instead of editing `/etc/nixos` automatically. ASUS Linux's supported distro list and package availability change over time; check its [current distro documentation](https://github.com/OpenGamingCollective/asusctl/blob/main/docs/getting-started/supported-distributions.md) if a package is missing. Hardware support also depends on the laptop model, kernel, and firmware.
+
+The app is installed in the current user's `~/.local` directories. To remove it:
 
 ```sh
-./install-armoury-crate.sh uninstall
+./uninstall.sh
 ```
 
 ## Packages

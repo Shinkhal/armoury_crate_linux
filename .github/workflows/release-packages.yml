@@ -2,8 +2,6 @@ name: Build release packages
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
 
@@ -14,7 +12,7 @@ jobs:
   packages:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install package builders
         run: |
           sudo apt-get update
@@ -26,8 +24,12 @@ jobs:
           fi
       - name: Build RPM and DEB packages
         run: ./packaging/build-packages.sh
+      - name: Validate package metadata
+        run: |
+          dpkg-deb --info dist/*.deb
+          rpm -qip dist/*.rpm
       - name: Upload package artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.2
         with:
           name: armoury-crate-packages
           path: dist/*

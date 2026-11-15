@@ -147,7 +147,7 @@ install_packages() {
                 printf 'Enabling it adds a third-party package source and its signing keys to this system.\n'
                 read -r -p 'Add the Terra repository and install the missing packages? [y/N] ' answer
                 [[ "$answer" =~ ^[Yy]$ ]] || fail "Enable the ASUS Linux/Terra repository manually, install asusctl and supergfxctl, then rerun ./install.sh."
-                "${privilege[@]}" dnf install --nogpgcheck --repofrompath "terra,https://repos.fyralabs.com/terra\$releasever" terra-release
+                "${privilege[@]}" dnf install --repofrompath "terra,https://repos.fyralabs.com/terra\$releasever" terra-release
             fi
             "${privilege[@]}" "$manager" install -y "${packages[@]}"
             ;;

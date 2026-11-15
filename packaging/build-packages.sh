@@ -3,6 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d '\n' < "$ROOT_DIR/VERSION")"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.+~-][0-9A-Za-z.-]+)?$ ]] || {
+    echo "Invalid or missing release version: $VERSION" >&2
+    exit 1
+}
 OUTPUT_DIR="${1:-$ROOT_DIR/dist}"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT
@@ -39,5 +43,11 @@ rpmbuild -bb "$ROOT_DIR/packaging/rpm/armoury-crate.spec" \
     --define "_topdir $RPM_TOP" --define "_sourcedir $RPM_TOP/SOURCES" \
     --define "pkg_version $VERSION"
 find "$RPM_TOP/RPMS" -type f -name '*.rpm' -exec cp -f {} "$OUTPUT_DIR/" \;
+
+DEB_PACKAGE="$OUTPUT_DIR/armoury-crate_${VERSION}_all.deb"
+RPM_PACKAGE="$(find "$OUTPUT_DIR" -maxdepth 1 -type f -name "armoury-crate-*.rpm" -print -quit)"
+dpkg-deb --info "$DEB_PACKAGE" >/dev/null
+[[ -n "$RPM_PACKAGE" ]] && rpm -qip "$RPM_PACKAGE" >/dev/null
+test -f "$DEB_PACKAGE"
 
 echo "Built packages in $OUTPUT_DIR"

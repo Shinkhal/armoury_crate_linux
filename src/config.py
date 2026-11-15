@@ -2,7 +2,17 @@
 import glob
 import os
 
+
+def _positive_float(value, default):
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
 APP_ID = "io.github.armourycrate"
+TELEMETRY_REFRESH_SECONDS = _positive_float(os.getenv("ARMOURY_TELEMETRY_INTERVAL"), 4.0)
+DEVICE_MONITOR_REFRESH_SECONDS = _positive_float(os.getenv("ARMOURY_DEVICE_INTERVAL"), 1.0)
 ASSET_DIR = os.path.join(os.path.expanduser("~/.local/share/armoury-crate"), "assets")
 ASUSD_NAME = "xyz.ljones.Asusd"
 ASUSD_PATH = "/xyz/ljones"

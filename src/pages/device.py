@@ -6,6 +6,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gdk, GLib, Gtk
 
+from config import DEVICE_MONITOR_REFRESH_SECONDS
 from components.widgets import label
 from hardware.asus import fan_hwmon, fan_read, rpm
 from hardware.system import (
@@ -79,7 +80,7 @@ class DevicePage:
         self.device_tab_buttons["monitor"].set_active(True)
         self.on_device_level_changed(self.device_level_dropdown, None)
         self.refresh_device_monitor()
-        GLib.timeout_add_seconds(1, self.refresh_device_monitor)
+        GLib.timeout_add_seconds(max(1, round(DEVICE_MONITOR_REFRESH_SECONDS)), self.refresh_device_monitor)
         return outer
 
     def _build_resource_monitor(self):

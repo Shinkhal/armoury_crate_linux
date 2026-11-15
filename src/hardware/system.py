@@ -9,6 +9,7 @@ _cpu_times = None
 _gpu_names = None
 _nvidia_gpu_cache = None
 _nvidia_gpu_cache_time = 0.0
+_NVIDIA_GPU_CACHE_TTL = 8.0
 
 
 def read_memory():
@@ -42,9 +43,10 @@ def estimate_battery_minutes(status, current, full, rate):
 
 
 def read_battery_state():
+    batteries = []
     for battery_path in sorted(glob.glob("/sys/class/power_supply/BAT*")):
         capacity = int_or_none(text(os.path.join(battery_path, "capacity"), ""))
-        status = text(os.path.join(battery_path, "status"), "Unknown")
+        status = text(os.path.join(battery_path, "status"), "Unknown").strip().title()
         energy_now = int_or_none(text(os.path.join(battery_path, "energy_now"), ""))
         energy_full = int_or_none(text(os.path.join(battery_path, "energy_full"), ""))
         power_now = int_or_none(text(os.path.join(battery_path, "power_now"), ""))
@@ -54,9 +56,43 @@ def read_battery_state():
         remaining = energy_now if energy_now is not None else charge_now
         full = energy_full if energy_now is not None else charge_full
         rate = power_now if energy_now is not None else current_now
-        eta = estimate_battery_minutes(status, remaining, full, rate)
-        return capacity, status, eta
-    return None, "Unknown", None
+        if remaining is None or full is None or full <= 0:
+            continue
+        batteries.append({
+            "capacity": capacity,
+            "status": status,
+            "remaining": remaining,
+            "full": full,
+            "rate": rate,
+            # Energy and charge values cannot be added together safely.
+            "unit": "energy" if energy_now is not None else "charge",
+        })
+    if not batteries:
+        return None, "Unknown", None
+
+    total_full = sum(item["full"] for item in batteries)
+    total_remaining = sum(item["remaining"] for item in batteries)
+    capacity = round(total_remaining * 100 / total_full) if total_full else None
+    statuses = {item["status"].lower() for item in batteries}
+    if "discharging" in statuses:
+        status = "Discharging"
+    elif "charging" in statuses:
+        status = "Charging"
+    elif statuses and statuses <= {"full"}:
+        status = "Full"
+    else:
+        status = next(iter(statuses)).title() if statuses else "Unknown"
+
+    # Only calculate a combined ETA when every battery uses the same unit.
+    eta = None
+    if len({item["unit"] for item in batteries}) == 1:
+        eta = estimate_battery_minutes(
+            status,
+            total_remaining,
+            total_full,
+            sum(item["rate"] or 0 for item in batteries),
+        )
+    return capacity, status, eta
 
 
 def read_disks():
@@ -155,11 +191,11 @@ def gpu_telemetry():
                     digits = "".join(character for character in line.split(":", 1)[-1] if character.isdigit())
                     frequency = int_or_none(digits)
                     break
-        if frequency is not None:
+        if frequency is not None and result["frequency"] is None:
             result["frequency"] = frequency
         used = int_or_none(text(os.path.join(device, "mem_info_vram_used"), ""))
         total = int_or_none(text(os.path.join(device, "mem_info_vram_total"), ""))
-        if used is not None and total:
+        if used is not None and total and result["memory_total"] is None:
             result["memory_used"], result["memory_total"] = used, total
 
     now = time.monotonic()
@@ -183,7 +219,11 @@ def gpu_telemetry():
                     _nvidia_gpu_cache_time = now
             except ValueError:
                 pass
-    if _nvidia_gpu_cache is not None:
+    # Never let a successful old sample mask unavailable hardware forever.
+    # Keep the short query cache above, but expire it even when nvidia-smi
+    # disappears or starts failing. Sysfs readings collected above remain a
+    # useful per-sensor fallback.
+    if _nvidia_gpu_cache is not None and now - _nvidia_gpu_cache_time <= _NVIDIA_GPU_CACHE_TTL:
         result.update(_nvidia_gpu_cache)
     return result
 

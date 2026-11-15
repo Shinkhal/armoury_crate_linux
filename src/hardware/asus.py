@@ -109,9 +109,22 @@ def nearest_charge_limit(value):
 
 
 def fan_hwmon():
-    for path in glob.glob("/sys/devices/platform/asus-nb-wmi/hwmon/hwmon*"):
-        if os.path.exists(os.path.join(path, "fan1_input")):
-            return path
+    """Return the hwmon device exposing ASUS fan tachometers.
+
+    The kernel exposes this device under different platform paths depending
+    on the laptop generation (asus-nb-wmi, asus_wmi, or a vendor-specific
+    ASUS driver), so relying on one path makes otherwise supported machines
+    appear to have no fans.
+    """
+    candidates = []
+    for path in glob.glob("/sys/class/hwmon/hwmon*"):
+        if not os.path.exists(os.path.join(path, "fan1_input")):
+            continue
+        name = text(os.path.join(path, "name"), "").lower()
+        priority = 0 if name in {"asus", "asus_wmi", "asus-nb-wmi"} else 1
+        candidates.append((priority, path))
+    if candidates:
+        return sorted(candidates)[0][1]
     return None
 
 

@@ -9,7 +9,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from config import (
     ASSET_DIR, CHARGE_LIMITS, GPU_MODES, PPD_IFACE, PPD_NAME, PPD_PATH,
-    PROFILE_IDS,
+    PROFILE_IDS, TELEMETRY_REFRESH_SECONDS,
 )
 from components.widgets import asus_image, label, page_heading
 from hardware.asus import (
@@ -80,7 +80,9 @@ class ArmouryWindow(
         header.pack_end(end_box)
         self.set_titlebar(header)
         self.build_pages()
-        GLib.timeout_add_seconds(4, self.refresh_timer)
+        self.telemetry_timer_id = GLib.timeout_add_seconds(
+            max(1, round(TELEMETRY_REFRESH_SECONDS)), self.refresh_timer
+        )
         self.refresh()
 
     def add_page(self, name, title, icon_file, fallback_icon, builder):

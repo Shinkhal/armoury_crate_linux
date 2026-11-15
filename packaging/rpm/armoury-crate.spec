@@ -11,6 +11,7 @@ Requires:       libadwaita
 Requires:       asusctl
 Requires:       supergfxctl
 Requires:       pciutils
+Requires:       procps-ng
 
 %description
 Community-built Armoury Crate-inspired controls for Linux, including ASUS
@@ -34,8 +35,8 @@ install -Dpm 0644 %{_sourcedir}/armoury-crate.svg %{buildroot}%{_datadir}/icons/
 %{_datadir}/icons/hicolor/scalable/apps/armoury-crate.svg
 
 %changelog
-* Sun Nov 15 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.4-1
-- Add cross-distribution install and uninstall scripts with dependency checks
+* Sun Nov 15 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.5-1
+- Stabilize telemetry, fan detection, packaging, and release validation
 
 * Sun Nov 15 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.3-1
 - Add live device resource monitoring and running application usage

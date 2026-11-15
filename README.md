@@ -4,10 +4,16 @@ A community-built GTK4/libadwaita control center for supported ASUS laptops. It 
 
 ## Features
 
-- Live CPU/GPU temperatures, fan speeds, RAM and storage usage.
-- ASUS performance profiles and battery charge limit.
-- Keyboard backlight controls and supported Aura effects.
+- Dashboard with device, processor, graphics, operating-system, CPU, memory, storage, battery, fan, and GPU-mode details.
+- Device page with separate **Resource Monitor** and **Running Applications** views. The monitor plots live CPU/GPU, memory, disk, and fan telemetry, with four metric levels and 1-, 5-, or 10-minute history views. Sensor coverage depends on the hardware and available Linux drivers.
+- Running application usage grouped by process name, with CPU and resident-memory readings.
+- ASUS Quiet, Balanced, and Performance profiles, plus supported battery charge-limit controls.
+- Keyboard backlight controls and supported Aura effects, with a multi-row effect picker, color presets, and the native color picker.
 - Integrated/hybrid GPU mode through `supergfxctl`.
+
+Telemetry is read from Linux interfaces such as `/proc`, `/sys`, hwmon, and available vendor utilities. Missing or unsupported sensors are shown as unavailable; support varies by laptop, firmware, GPU, and installed drivers.
+
+See [the monitoring and hardware support guide](docs/monitoring-and-controls.md) for metric levels, data sources, and known limitations.
 
 ## Source layout
 
@@ -26,6 +32,8 @@ Hardware support varies by laptop and firmware. Unsupported controls are not emu
 - A Linux desktop with Python 3, GTK 4, libadwaita, and PyGObject.
 - `asusctl` for ASUS profile, battery, and keyboard-lighting controls.
 - `supergfxctl` for GPU mode switching.
+- `ps` (from `procps`) for the Running Applications view.
+- `nvidia-smi` is optional and used for NVIDIA telemetry when available; AMD/Linux DRM sysfs sensors are used where exposed.
 - An ASUS laptop with the corresponding kernel/firmware interfaces.
 
 Install those runtime dependencies using your distribution's package manager, then run:

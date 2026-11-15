@@ -65,17 +65,47 @@ window .info-val { color: #f4f5f8; font-size: 13px; font-weight: 700; }
 window .opt-key { color: #9aa2b1; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
 window .swatch { border-radius: 8px; border: 1px solid #303641; }
 window .lighting-description { color: #9299a7; font-size: 12px; }
+window .lighting-layout { min-width: 520px; }
+window .lighting-effects-panel { min-height: 360px; padding: 20px; border-radius: 5px; background: #101114; border-color: #292b31; }
+window .lighting-section-header { min-height: 42px; margin-bottom: 2px; }
+window .lighting-section-icon { min-width: 36px; min-height: 36px; padding: 7px; color: #ff5369; background: rgba(229,43,69,.10); border-radius: 4px; }
+window .lighting-section-title { color: #f3f4f7; font-size: 15px; font-weight: 750; }
+window .lighting-section-description { color: #8f98a7; font-size: 11px; }
+window grid.lighting-effects-grid { margin-top: 4px; }
+window button.lighting-effect-button { min-width: 74px; min-height: 94px; padding: 8px 5px; color: #b9bdc5; background: transparent; border: 1px solid transparent; border-radius: 4px; box-shadow: none; }
+window button.lighting-effect-button:hover { color: #fff; background: rgba(255,255,255,.045); border-color: #353840; box-shadow: none; }
+window button.lighting-effect-button:checked { color: #fff; background: rgba(229,43,69,.10); border-color: rgba(229,43,69,.65); box-shadow: inset 0 -2px #f32942; }
+window .lighting-effect-icon { color: #aeb2bb; }
+window button.lighting-effect-button:checked .lighting-effect-icon { color: #ff334f; }
+window .lighting-effect-label { min-height: 26px; color: inherit; font-size: 10px; font-weight: 650; }
+window .lighting-settings { min-width: 270px; padding: 18px; border-radius: 5px; background: #101114; border-color: #292b31; }
+window .lighting-settings-heading { color: #e2e4e9; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; }
+window .lighting-selected-effect { color: #f4f5f8; font-size: 16px; font-weight: 750; }
+window .lighting-description { color: #9299a7; font-size: 11px; }
+window .lighting-control-heading { color: #b8bdc6; font-size: 10px; font-weight: 750; letter-spacing: .8px; }
+window .lighting-brightness-value { color: #c5cad3; font-size: 11px; font-weight: 650; }
+window .lighting-status { min-height: 14px; color: #8791a0; font-size: 10px; }
+window .lighting-color-row { min-height: 40px; padding: 3px 0; }
+window .lighting-color-label { min-width: 66px; color: #9da5b2; font-size: 9px; font-weight: 700; letter-spacing: .7px; }
+window button.lighting-color-swatch { min-width: 29px; min-height: 29px; padding: 3px; border-radius: 999px; background: transparent; border: 1px solid transparent; box-shadow: none; }
+window button.lighting-color-swatch:hover { background: #252a34; border-color: #5b6371; box-shadow: none; }
+window button.lighting-color-swatch.selected { background: rgba(229,43,69,.14); border-color: #ff4059; box-shadow: none; }
+window .lighting-color-picker-overlay { min-width: 38px; min-height: 38px; }
+window button.color-picker-button { min-width: 36px; min-height: 36px; padding: 0; border-radius: 999px; }
+window .lighting-color-picker-pin { padding: 3px; color: #fff; background: rgba(16,17,20,.9); border: 1px solid rgba(255,255,255,.7); border-radius: 999px; }
+window scale.lighting-slider { min-height: 25px; }
+window scale.lighting-slider trough { min-height: 4px; background: #373a40; border-radius: 0; }
+window scale.lighting-slider trough highlight { background: #f32942; border-radius: 0; }
+window scale.lighting-slider slider { min-width: 13px; min-height: 13px; background: #e5e7eb; border: 1px solid #ff334f; border-radius: 2px; }
+window box.lighting-settings > separator { background: #36383d; }
+window button.lighting-direction-button { min-width: 38px; min-height: 32px; color: #aeb5c0; background: #17191e; border: 1px solid #34373d; border-radius: 3px; box-shadow: none; }
+window button.lighting-direction-button:checked { color: #fff; background: rgba(229,43,69,.2); border-color: #ef334c; }
 window .color-palette { margin-top: 2px; margin-bottom: 8px; }
 window button.color-swatch { min-width: 34px; min-height: 34px; padding: 3px; border-radius: 999px; background: transparent; border: 1px solid transparent; box-shadow: none; }
 window button.color-swatch:hover { background: #252a34; border-color: #5b6371; box-shadow: none; }
 window button.color-swatch.selected { background: rgba(229, 43, 69, 0.14); border-color: #ff4059; box-shadow: none; }
 window .color-chip { min-width: 22px; min-height: 22px; }
 window .color-picker-button { min-height: 36px; }
-window entry.hex-entry { min-width: 98px; font-family: monospace; letter-spacing: 0.4px; }
-window entry.hex-entry.invalid { border-color: #ff4059; }
-window button.brightness-option { min-width: 92px; min-height: 52px; background: #11151c; border: 1px solid #303641; color: #d9dde5; box-shadow: none; }
-window button.brightness-option:hover { background: #1b1e27; border-color: #68707d; box-shadow: none; }
-window button.brightness-option.active { background: rgba(229, 43, 69, 0.16); border-color: #ff4059; color: #fff; box-shadow: none; }
 window headerbar { background: #0d1016; border-bottom: 1px solid #232833; box-shadow: none; }
 window headerbar button { box-shadow: none; }
 window .header-title { color: #f4f5f8; font-size: 15px; font-weight: 600; letter-spacing: 0; }
@@ -85,6 +115,35 @@ window .monitor-panel-title { color: #f4f5f8; font-size: 28px; font-weight: 400;
 window .monitor-header { color: #f4f5f8; font-size: 17px; font-weight: 700; }
 window .device-hero { min-height: 205px; padding: 22px; border: 1px solid #303641; border-radius: 12px; background: #0b0e13; }
 window .device-hero-copy { background: linear-gradient(90deg, rgba(9, 11, 16, .97), rgba(9, 11, 16, .82) 56%, rgba(9, 11, 16, .08)); padding: 18px; }
+window .device-tabs { min-height: 38px; border-bottom: 1px solid #343b46; }
+window button.device-tab { min-width: 150px; padding: 8px 14px; color: #929cab; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; font-size: 12px; font-weight: 700; }
+window button.device-tab:hover { color: #f2f4f7; background: rgba(255,255,255,.035); box-shadow: none; }
+window button.device-tab:checked { color: #ff5268; border-bottom-color: #ff334f; box-shadow: none; }
+window .resource-toolbar { min-height: 38px; }
+window .resource-recording { color: #ff5268; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+window .resource-toolbar-label { color: #8892a0; font-size: 9px; font-weight: 800; letter-spacing: 1px; }
+window button.resource-record-button { min-width: 72px; min-height: 29px; padding: 3px 12px; color: #e4e8ed; background: #171c24; border: 1px solid #59616c; border-radius: 3px; box-shadow: none; font-size: 11px; }
+window button.resource-record-button:hover { background: #222a34; box-shadow: none; }
+window .resource-monitor-frame { min-height: 520px; background: #080b10; border: 1px solid #343b46; border-radius: 4px; }
+window .resource-chart-wrap { min-width: 420px; padding: 8px; }
+window .resource-chart { min-height: 500px; }
+window .resource-metrics-panel { min-width: 164px; padding: 12px 7px; background: #10151c; border-left: 1px solid #343b46; }
+window .resource-metrics-heading { color: #aeb7c4; font-size: 10px; font-weight: 800; letter-spacing: 1.3px; }
+window .device-resource-detail { color: #86909f; font-size: 10px; }
+window .resource-metric-row { min-height: 26px; border-bottom: 1px solid rgba(120, 128, 142, .12); }
+window .resource-metric-dot { min-width: 12px; font-size: 9px; }
+window .resource-metric-name { color: #c9d0d9; font-size: 10px; }
+window .resource-metric-value { min-width: 58px; color: #f4f5f8; font-size: 10px; font-weight: 700; }
+window .applications-panel { padding: 14px 16px; background: #10151c; border: 1px solid #343b46; border-radius: 4px; }
+window .applications-heading { min-height: 38px; margin-bottom: 10px; }
+window .applications-list-headings { min-height: 34px; padding: 0 12px; border-bottom: 1px solid #424a56; }
+window .device-process-column { color: #8792a1; font-size: 9px; font-weight: 800; letter-spacing: .8px; }
+window .application-row { min-height: 42px; padding: 2px 12px; border-bottom: 1px solid rgba(120, 128, 142, .10); border-radius: 3px; }
+window .application-row:hover { background: rgba(80, 145, 230, .09); }
+window .applications-row-alt { background: rgba(255,255,255,.018); }
+window .device-process-name { color: #e5e8ed; font-size: 12px; }
+window .application-icon { min-width: 22px; color: #aab5c4; }
+window .device-process-value { color: #d4d9e1; font-size: 11px; font-variant-numeric: tabular-nums; }
 window .dashboard-top { margin-bottom: 16px; }
 window .dashboard-monitor { min-width: 400px; }
 window .dashboard-monitor-grid { min-width: 400px; }
@@ -104,24 +163,43 @@ window button.nav { min-height: 40px; margin: 1px 0; font-size: 13px; }
 window button.nav:checked { background: linear-gradient(90deg, rgba(229,43,69,.24), rgba(229,43,69,.06)); border-color: transparent; border-left: 3px solid #e52b45; }
 window .ac-dashboard { padding: 8px 10px 12px; }
 window .dashboard-toolbar { min-height: 48px; }
-window .dashboard-brand-image { min-width: 90px; min-height: 30px; }
-window .dashboard-machine-spec { font-size: 11px; color: #c6cad0; }
+window .dashboard-brand-image { min-width: 105px; min-height: 32px; }
+window .dashboard-system-strip { min-height: 100px; padding: 12px 10px; background: linear-gradient(100deg, #11161d, #0d1117); border: 1px solid #303741; border-radius: 4px; }
+window .dashboard-system-heading { min-height: 34px; color: #f1f3f6; font-size: 15px; font-weight: 750; }
+window .dashboard-system-info-item { padding: 0 13px; }
+window .dashboard-info-icon { color: #a7b2c3; }
+window .dashboard-info-label { color: #929cab; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+window .dashboard-info-value { color: #f1f3f6; font-size: 13px; font-weight: 650; }
+window .dashboard-system-strip separator { margin: 2px 0; background: #303741; }
 window .dashboard-module { background: repeating-linear-gradient(135deg, #0e1116, #0e1116 3px, #12161c 3px, #12161c 5px); border: 1px solid #394047; border-radius: 3px; padding: 10px; }
 window .dashboard-module-title { min-height: 30px; padding: 4px 8px; color: #dce1e8; font-size: 13px; font-weight: 700; background: repeating-linear-gradient(135deg, #11151b, #11151b 4px, #171c22 4px, #171c22 6px); border: 1px solid #48515a; }
+window .dashboard-compact-module { padding: 7px 9px; }
+window .dashboard-compact-module .dashboard-module-title { min-height: 23px; padding: 2px 7px; }
+window .dashboard-compact-module .dashboard-stat-row { min-height: 18px; }
 window .dashboard-stat-row { min-height: 24px; }
-window .dashboard-stat-name { color: #d7dce4; font-size: 12px; }
-window .dashboard-stat-value { color: #fff; font-size: 12px; font-weight: 700; }
+window .dashboard-stat-name { color: #d7dce4; font-size: 13px; }
+window .dashboard-stat-value { color: #fff; font-size: 14px; font-weight: 700; }
+window .dashboard-compact-module .dashboard-stat-row { min-height: 23px; }
+window .dashboard-fan-metric { min-height: 56px; padding: 7px 9px; background: rgba(18, 23, 30, .8); border: 1px solid #394047; border-radius: 3px; }
+window .dashboard-fan-meter trough { min-height: 5px; background: #242a32; border-radius: 3px; }
+window .dashboard-fan-meter trough highlight { background: linear-gradient(90deg, #3b8dff, #ff4059); border-radius: 3px; }
 window .dashboard-tiny { color: #8b949e; font-size: 10px; }
 window .dashboard-quick-button { background: linear-gradient(#282b30, #101216); color: #f2f4f6; border: 1px solid #5b6065; border-radius: 2px; padding: 6px 10px; box-shadow: none; }
 window .dashboard-mode-button { background: transparent; color: #ddd; border: 0; border-bottom: 2px solid #40464e; border-radius: 0; padding: 8px 4px; box-shadow: none; }
 window .dashboard-mode-button.active { color: #ff5268; border-bottom-color: #ff334f; background: rgba(229,43,69,.1); }
-window .dashboard-cpu-gauge { min-height: 330px; }
+window .dashboard-cpu-gauge { min-height: 260px; }
 window .dashboard-gauge-value { font-size: 30px; font-weight: 700; color: #f5f6f8; }
 window .dashboard-gauge-label { color: #b7bdc7; font-size: 11px; }
 window .dashboard-meter trough { min-height: 6px; background: #20252c; border-radius: 0; }
 window .dashboard-meter trough highlight { background: linear-gradient(90deg, #08aaff, #e52b45); border-radius: 0; }
-window .dashboard-profile-entry { padding: 8px 5px; }
+window .dashboard-profile-entry { min-height: 68px; margin: 4px; padding: 12px 14px; }
+window .dashboard-profile-entry .profile-symbol { min-width: 28px; margin-right: 4px; padding: 0; background: transparent; border: 0; border-radius: 0; color: #ff5268; font-size: 20px; }
 window .dashboard-profile-entry.active { background: rgba(229,43,69,.12); border-bottom: 2px solid #e52b45; }
+window button.dashboard-action-button { min-height: 42px; padding: 7px 10px; background: #151a22; border: 1px solid #303742; border-radius: 4px; color: #e9edf3; box-shadow: none; }
+window button.dashboard-action-button:hover { background: #202630; border-color: #596474; box-shadow: none; }
+window .dashboard-action-label { color: #e9edf3; font-size: 12px; font-weight: 650; }
+window .dashboard-battery-meter trough { min-height: 8px; background: #252a32; border-radius: 4px; }
+window levelbar.dashboard-battery-meter block.filled { background: linear-gradient(90deg, #34c98b, #80dd78); border: 0; border-radius: 4px; }
 window .dashboard-unsupported { color: #7d858f; font-size: 11px; }
 window .dashboard-value-large { font-size: 20px; font-weight: 700; color: #f7f8fa; }
 window button.mode-option { background: transparent; border: 0; border-bottom: 1px solid #34363b; border-radius: 0; padding: 12px 10px 16px; box-shadow: none; }

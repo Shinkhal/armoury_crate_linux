@@ -15,12 +15,12 @@ from components.widgets import asus_image, label, page_heading
 from hardware.asus import (
     command, fan_hwmon, fan_read, get_prop, int_or_none,
     nearest_charge_limit, power_adapter_online, read_limit, read_profile,
-    rpm, set_prop,
+    rpm, set_prop, system_bus,
 )
 from hardware.system import (
     cpu_freq_ghz, cpu_model, cpu_usage_percent, disk_usage, gpu_names,
     gpu_usage_percent, os_pretty_name, pretty_product_name, read_disks,
-    read_memory, read_thermal, text,
+    read_battery_state, read_memory, read_thermal, text,
 )
 from styles import CSS
 from pages.dashboard import DashboardPage
@@ -161,6 +161,7 @@ class ArmouryWindow(
     def on_sidebar_toggle(self, button):
         self.sidebar_collapsed = button.get_active()
         self.sidebar.set_size_request(68 if self.sidebar_collapsed else 250, -1)
+        self.sidebar.set_spacing(12 if self.sidebar_collapsed else 6)
         button.set_tooltip_text("Expand navigation" if self.sidebar_collapsed else "Collapse navigation")
         for widget in self.sidebar_labels + [w for w in self.sidebar_compact_hidden if w is not None]:
             widget.set_visible(not self.sidebar_collapsed)
@@ -254,6 +255,7 @@ class ArmouryWindow(
             self.dashboard_gpu_usage_bar.set_value(gpu_usage or 0)
             for key, speed in (("cpu_fan", cpu), ("gpu_fan", gpu)):
                 self.dashboard_values[key].set_text(rpm(speed))
+                self.dashboard_fan_bars[key].set_value(max(0, min(6000, speed or 0)))
             self.dashboard_resource_values["storage"].set_text(f"{free_gb:.0f} GB free · {used_pct:.0f}% used")
             self.dashboard_bars["storage"].set_value(used_pct)
             memory_total, memory_available = read_memory()
@@ -265,7 +267,20 @@ class ArmouryWindow(
             disk_models = read_disks()
             self.dashboard_resource_values["ssd"].set_text(" · ".join(disk_models) if disk_models else "Unavailable")
             self.dashboard_bars["ssd"].set_value(used_pct)
-            self.dashboard_battery_value.set_text(f"{level}%" if (level := int_or_none(text("/sys/class/power_supply/BAT1/capacity", ""))) is not None else "—")
+            battery_level, battery_status, battery_eta = read_battery_state()
+            battery_label = f"{battery_level}% · {battery_status}" if battery_level is not None else "Unavailable"
+            self.dashboard_battery_value.set_text(battery_label)
+            self.dashboard_battery_bar.set_value(battery_level or 0)
+            if battery_status == "Full":
+                estimate_label = "Fully charged"
+            elif battery_eta is None:
+                estimate_label = "Time estimate unavailable"
+            else:
+                hours, minutes = divmod(battery_eta, 60)
+                duration = f"{hours}h {minutes:02d}m" if hours else f"{minutes}m"
+                suffix = "to full" if battery_status == "Charging" else "remaining"
+                estimate_label = f"Estimated {duration} {suffix}"
+            self.dashboard_battery_eta.set_text(estimate_label)
         level = int_or_none(text("/sys/class/power_supply/BAT1/capacity", ""))
         status = text("/sys/class/power_supply/BAT1/status", "Battery status unavailable")
         self.battery_level_value.set_text(f"{level}% · {status}" if level is not None else status)
@@ -285,17 +300,16 @@ class ArmouryWindow(
         self.battery_charge_value.set_text(charge_state)
         self.battery_control_value.set_text("Firmware controlled")
         brightness = int_or_none(text("/sys/class/leds/asus::kbd_backlight/brightness", ""))
-        if brightness is not None and 0 <= brightness < len(self.brightness_buttons):
-            if not self.brightness_dirty:
-                self.syncing_brightness = True
-                for index, button in enumerate(self.brightness_buttons):
-                    button.set_active(index == brightness)
-                self.syncing_brightness = False
-            if not self.brightness_dirty:
-                brightness_label = ("Off", "Low", "Medium", "High")[brightness]
-                self.brightness_feedback.set_text(
-                    f"Current keyboard backlight: {brightness_label}."
-                )
+        if brightness is not None and 0 <= brightness <= 3 and hasattr(self, "brightness_scale"):
+            self.syncing_brightness = True
+            self.brightness_scale.set_value(brightness)
+            self.syncing_brightness = False
+            self.last_brightness_level = brightness
+            brightness_label = ("Off", "Low", "Medium", "High")[brightness]
+            self.brightness_value_label.set_text(f"{brightness_label} · {round(brightness * 100 / 3)}%")
+            self.brightness_feedback.set_text(
+                f"Current keyboard backlight: {brightness_label}."
+            )
         gpu_mode = command(["supergfxctl", "-g"])
         self.gpu_current_value.set_text(gpu_mode.stdout.strip() if gpu_mode.returncode == 0 else "Unavailable")
         if hasattr(self, "dashboard_gpu_mode_value"):
@@ -323,30 +337,33 @@ class ArmouryWindow(
         self.toast("Status refreshed")
 
     def on_profile_clicked(self, _button, name):
-        # Prefer the desktop power-profiles daemon so TuneD (which also owns the
-        # firmware platform profile applies the mode itself. This
-        # keeps the selected fan mode from being overwritten a moment later.
+        # Use asusctl first so the ASUS profile manager applies its matching
+        # power and fan policy. Fall back to the desktop profile service on
+        # systems where asusd is unavailable.
         ppd_profile = {"Quiet": "power-saver", "Balanced": "balanced", "Performance": "performance"}.get(name)
-        applied = False
-        bus = system_bus()
-        if bus is not None and ppd_profile is not None:
-            try:
-                # power-profiles-daemon has no SetActiveProfile method; the
-                # supported way to switch is the ActiveProfile D-Bus property.
-                bus.call_sync(PPD_NAME, PPD_PATH, "org.freedesktop.DBus.Properties", "Set",
-                              GLib.Variant("(ssv)", (PPD_IFACE, "ActiveProfile", GLib.Variant("s", ppd_profile))), None,
-                              Gio.DBusCallFlags.NONE, 5000, None)
-                applied = True
-            except GLib.Error:
-                applied = False
+        result = command(["asusctl", "profile", "set", name])
+        applied = result.returncode == 0
+        error = (result.stderr or result.stdout).strip()
+
+        if not applied and ppd_profile is not None:
+            bus = system_bus()
+            if bus is not None:
+                try:
+                    # Power Profiles exposes ActiveProfile as a writable D-Bus
+                    # property; there is no SetActiveProfile method.
+                    bus.call_sync(PPD_NAME, PPD_PATH, "org.freedesktop.DBus.Properties", "Set",
+                                  GLib.Variant("(ssv)", (PPD_IFACE, "ActiveProfile", GLib.Variant("s", ppd_profile))), None,
+                                  Gio.DBusCallFlags.NONE, 5000, None)
+                    applied = True
+                except GLib.Error as dbus_error:
+                    error = str(dbus_error)
+
         if not applied:
-            result = command(["asusctl", "profile", "set", name])
-            if result.returncode != 0:
-                ok = set_prop("PlatformProfile", GLib.Variant("u", PROFILE_IDS[name]))
-                if not ok:
-                    self.toast(f"Could not select {name}: {(result.stderr or result.stdout).strip() or 'asusd unavailable'}")
-                    self.refresh()
-                    return
+            applied = set_prop("PlatformProfile", GLib.Variant("u", PROFILE_IDS[name]))
+        if not applied:
+            self.toast(f"Could not select {name}: {error or 'ASUS profile service is unavailable'}")
+            self.refresh()
+            return
         # The firmware takes up to ~1s to report the new profile; highlight the
         # requested card now and confirm after the change has propagated.
         self.pending_profile = name

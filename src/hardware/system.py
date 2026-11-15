@@ -1,11 +1,14 @@
 """Linux hardware telemetry and system identity discovery."""
 import glob
 import os
+import time
 
 from hardware.asus import command, int_or_none, text
 
 _cpu_times = None
 _gpu_names = None
+_nvidia_gpu_cache = None
+_nvidia_gpu_cache_time = 0.0
 
 
 def read_memory():
@@ -20,6 +23,40 @@ def read_memory():
     except (OSError, ValueError, IndexError):
         pass
     return total, available
+
+
+def estimate_battery_minutes(status, current, full, rate):
+    if current is None or rate is None or rate == 0:
+        return None
+    rate = abs(rate)
+    state = status.strip().lower()
+    if state == "discharging":
+        remaining = current
+    elif state == "charging" and full is not None:
+        remaining = max(0, full - current)
+    elif state == "full":
+        return 0
+    else:
+        return None
+    return round(remaining / rate * 60)
+
+
+def read_battery_state():
+    for battery_path in sorted(glob.glob("/sys/class/power_supply/BAT*")):
+        capacity = int_or_none(text(os.path.join(battery_path, "capacity"), ""))
+        status = text(os.path.join(battery_path, "status"), "Unknown")
+        energy_now = int_or_none(text(os.path.join(battery_path, "energy_now"), ""))
+        energy_full = int_or_none(text(os.path.join(battery_path, "energy_full"), ""))
+        power_now = int_or_none(text(os.path.join(battery_path, "power_now"), ""))
+        current_now = int_or_none(text(os.path.join(battery_path, "current_now"), ""))
+        charge_now = int_or_none(text(os.path.join(battery_path, "charge_now"), ""))
+        charge_full = int_or_none(text(os.path.join(battery_path, "charge_full"), ""))
+        remaining = energy_now if energy_now is not None else charge_now
+        full = energy_full if energy_now is not None else charge_full
+        rate = power_now if energy_now is not None else current_now
+        eta = estimate_battery_minutes(status, remaining, full, rate)
+        return capacity, status, eta
+    return None, "Unknown", None
 
 
 def read_disks():
@@ -100,6 +137,145 @@ def gpu_usage_percent():
     return None
 
 
+def gpu_telemetry():
+    """Read available GPU sensors from NVIDIA tooling or Linux DRM sysfs."""
+    global _nvidia_gpu_cache, _nvidia_gpu_cache_time
+    result = {
+        "usage": gpu_usage_percent(),
+        "temperature": read_thermal("amdgpu") or read_thermal("nvidia"),
+        "frequency": None,
+        "memory_used": None,
+        "memory_total": None,
+    }
+    for device in glob.glob("/sys/class/drm/card*/device"):
+        frequency = int_or_none(text(os.path.join(device, "gt_cur_freq_mhz"), ""))
+        if frequency is None:
+            for line in text(os.path.join(device, "pp_dpm_sclk"), "").splitlines():
+                if "*" in line:
+                    digits = "".join(character for character in line.split(":", 1)[-1] if character.isdigit())
+                    frequency = int_or_none(digits)
+                    break
+        if frequency is not None:
+            result["frequency"] = frequency
+        used = int_or_none(text(os.path.join(device, "mem_info_vram_used"), ""))
+        total = int_or_none(text(os.path.join(device, "mem_info_vram_total"), ""))
+        if used is not None and total:
+            result["memory_used"], result["memory_total"] = used, total
+
+    now = time.monotonic()
+    if _nvidia_gpu_cache is None or now - _nvidia_gpu_cache_time >= 4:
+        nvidia = command([
+            "nvidia-smi",
+            "--query-gpu=utilization.gpu,temperature.gpu,clocks.gr,memory.used,memory.total",
+            "--format=csv,noheader,nounits",
+        ], timeout=2)
+        if nvidia.returncode == 0 and nvidia.stdout.strip():
+            fields = [part.strip() for part in nvidia.stdout.splitlines()[0].split(",")]
+            try:
+                if len(fields) >= 5:
+                    _nvidia_gpu_cache = {
+                        "usage": float(fields[0]),
+                        "temperature": float(fields[1]),
+                        "frequency": float(fields[2]),
+                        "memory_used": float(fields[3]) * 1_048_576,
+                        "memory_total": float(fields[4]) * 1_048_576,
+                    }
+                    _nvidia_gpu_cache_time = now
+            except ValueError:
+                pass
+    if _nvidia_gpu_cache is not None:
+        result.update(_nvidia_gpu_cache)
+    return result
+
+
+def read_disk_io_bytes():
+    """Return total sectors read and written across physical block devices."""
+    devices = set()
+    try:
+        devices = {
+            device for device in os.listdir("/sys/block")
+            if not device.startswith(("loop", "ram", "zram", "fd", "sr", "dm-"))
+        }
+        totals = [0, 0]
+        with open("/proc/diskstats", encoding="utf-8") as stream:
+            for line in stream:
+                fields = line.split()
+                if len(fields) > 9 and fields[2] in devices:
+                    totals[0] += int(fields[5])
+                    totals[1] += int(fields[9])
+        return totals[0] * 512, totals[1] * 512
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def read_disk_active_ms():
+    """Return cumulative busy time in milliseconds for physical block devices."""
+    try:
+        devices = {
+            device for device in os.listdir("/sys/block")
+            if not device.startswith(("loop", "ram", "zram", "fd", "sr", "dm-"))
+        }
+        active_ms = 0
+        count = 0
+        with open("/proc/diskstats", encoding="utf-8") as stream:
+            for line in stream:
+                fields = line.split()
+                if len(fields) > 12 and fields[2] in devices:
+                    active_ms += int(fields[12])
+                    count += 1
+        return active_ms, count
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def top_processes(limit=10):
+    """List active applications and processes by CPU and resident memory."""
+    result = command(["ps", "-eo", "pid=,comm=,pcpu=,rss="])
+    if result.returncode != 0:
+        return []
+    processes = []
+    for line in result.stdout.splitlines():
+        fields = line.split(None, 3)
+        if len(fields) != 4:
+            continue
+        try:
+            pid = int(fields[0])
+            cpu = float(fields[2])
+            memory_kib = int(fields[3])
+        except ValueError:
+            continue
+        if memory_kib <= 0:
+            continue
+        processes.append({
+            "pid": pid,
+            "name": fields[1],
+            "cpu": cpu,
+            "memory": memory_kib * 1024,
+        })
+
+    count = max(1, limit // 2)
+    by_cpu = sorted(processes, key=lambda item: item["cpu"], reverse=True)[:count]
+    by_memory = sorted(processes, key=lambda item: item["memory"], reverse=True)[:count]
+    selected = {process["pid"]: process for process in by_cpu + by_memory}
+
+    display_names = {
+        "firefox": "Firefox", "chrome": "Chrome", "chromium": "Chromium",
+        "steam": "Steam", "code": "VS Code", "discord": "Discord",
+        "obs": "OBS Studio", "vlc": "VLC", "spotify": "Spotify",
+        "thunderbird": "Thunderbird", "lutris": "Lutris", "heroic": "Heroic Games Launcher",
+        "gnome-shell": "GNOME Shell", "plasmashell": "KDE Plasma",
+    }
+    grouped = {}
+    for process in selected.values():
+        name = process["name"]
+        display_name = display_names.get(name.lower(), name.replace("_", " ").replace("-", " ").title())
+        app = grouped.setdefault(display_name, {"name": display_name, "cpu": 0.0, "memory": 0, "pids": []})
+        app["cpu"] += process["cpu"]
+        app["memory"] += process["memory"]
+        app["pids"].append(process["pid"])
+    return sorted(grouped.values(), key=lambda item: (item["cpu"], item["memory"]), reverse=True)[:limit]
+
+
 def cpu_model():
     try:
         with open("/proc/cpuinfo", encoding="utf-8") as stream:
@@ -109,6 +285,30 @@ def cpu_model():
     except (OSError, IndexError):
         pass
     return "Processor"
+
+
+def memory_details():
+    """Read RAM and swap totals, available values are in KiB."""
+    values = {}
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as stream:
+            for line in stream:
+                key, _, value = line.partition(":")
+                if key in ("MemTotal", "MemAvailable", "SwapTotal", "SwapFree"):
+                    values[key] = int(value.strip().split()[0])
+    except (OSError, ValueError, IndexError):
+        pass
+    return values
+
+
+def format_bytes(value):
+    if value is None:
+        return "Unavailable"
+    amount = float(value)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if amount < 1000 or unit == "TB":
+            return f"{amount:.1f} {unit}" if unit != "B" else f"{amount:.0f} B"
+        amount /= 1000
 
 
 def disk_usage(path="/"):

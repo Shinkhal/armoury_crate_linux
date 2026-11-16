@@ -5,7 +5,7 @@ A community-built GTK4/libadwaita control center for supported ASUS laptops. It 
 ## Features
 
 - Dashboard with device, processor, graphics, operating-system, CPU, memory, storage, battery, fan, and GPU-mode details.
-- Device page with separate **Resource Monitor** and **Running Applications** views. The monitor plots live CPU/GPU, memory, disk, and fan telemetry, with four metric levels and 1-, 5-, or 10-minute history views. Sensor coverage depends on the hardware and available Linux drivers.
+- Device page with **Resource Monitor**, **Running Applications**, and **Device Details** views. The monitor plots live CPU/GPU, memory, disk, and fan telemetry, with four metric levels and 1-, 5-, or 10-minute history views. Device Details summarizes CPU, memory, graphics, physical drives, and available SMART health. SMART results are stored in the user's cache directory until **Refresh SMART** is selected. Sensor coverage depends on the hardware and available Linux drivers.
 - Running application usage grouped by process name, with CPU and resident-memory readings.
 - ASUS Quiet, Balanced, and Performance profiles, plus supported battery charge-limit controls.
 - Keyboard backlight controls and supported Aura effects, with a multi-row effect picker, color presets, and the native color picker.
@@ -14,6 +14,16 @@ A community-built GTK4/libadwaita control center for supported ASUS laptops. It 
 Telemetry is read from Linux interfaces such as `/proc`, `/sys`, hwmon, and available vendor utilities. Missing or unsupported sensors are shown as unavailable; support varies by laptop, firmware, GPU, and installed drivers.
 
 See [the monitoring and hardware support guide](docs/monitoring-and-controls.md) for metric levels, data sources, and known limitations.
+
+## Project information
+
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Changelog](CHANGELOG.md)
+- [License](LICENSE)
+- [Citation metadata](CITATION.cff)
 
 ## Source layout
 
@@ -33,6 +43,7 @@ Hardware support varies by laptop and firmware. Unsupported controls are not emu
 - `asusctl` for ASUS profile, battery, and keyboard-lighting controls.
 - `supergfxctl` for GPU mode switching.
 - `ps` (from `procps`) for the Running Applications view.
+- `smartmontools` for storage health data; support depends on the drive and its permissions.
 - `nvidia-smi` is optional and used for NVIDIA telemetry when available; AMD/Linux DRM sysfs sensors are used where exposed.
 - An ASUS laptop with the corresponding kernel/firmware interfaces.
 

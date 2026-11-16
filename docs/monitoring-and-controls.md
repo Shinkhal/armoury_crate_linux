@@ -38,6 +38,15 @@ name where a mapping is known. CPU percentage and resident memory are read from
 four seconds and includes the busiest processes by CPU and memory, not every
 process on the system.
 
+The **Device Details** tab shows detected processor topology, CPU frequency and
+temperature, system memory and swap, available discrete and integrated GPU
+telemetry, and detected physical drives. SSD/HDD health fields come from
+`smartctl` when the device and permissions allow access. The first read is
+cached in the user's XDG cache directory and reused across application
+restarts. It is read again only when **Refresh SMART** is selected. Fields that
+the drive or driver does not expose are omitted; an unavailable field does not
+indicate a drive failure.
+
 ## Dashboard
 
 The dashboard summarizes system identity and the available CPU, graphics,

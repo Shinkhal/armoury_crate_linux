@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible problem with the application or installer.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Remove serial numbers, account names, hostnames, and other private details from logs.
+  - type: input
+    id: app-version
+    attributes:
+      label: Application version
+      description: For example, 0.3.0.
+    validations:
+      required: true
+  - type: input
+    id: laptop
+    attributes:
+      label: Laptop model
+      placeholder: ASUS model, if known
+    validations:
+      required: false
+  - type: input
+    id: distro
+    attributes:
+      label: Linux distribution and version
+    validations:
+      required: true
+  - type: input
+    id: kernel
+    attributes:
+      label: Kernel version
+      placeholder: Output of uname -r
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the exact page/control and any visible error message.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |-
+        1. Open…
+        2. Select…
+        3. Observe…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Remove private information. Do not attach firmware or proprietary ASUS assets.
+      render: text
+    validations:
+      required: false

@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest an improvement or new supported hardware feature.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Requests should fit within interfaces available on Linux and supported hardware.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should this solve?
+      description: Describe the task or limitation you are encountering.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+      description: Describe the behavior or controls you are proposing.
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware and Linux support
+      description: Include laptop model, distribution, kernel, and the Linux interface or utility that exposes this feature, if known.
+    validations:
+      required: false

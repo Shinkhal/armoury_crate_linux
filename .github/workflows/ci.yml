@@ -18,11 +18,33 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Syntax check
-        run: python -m py_compile src/hardware/system.py src/hardware/asus.py src/hardware/capabilities.py src/config.py
+      - name: Full-source syntax check
+        run: python -m compileall -q src/
 
-      - name: Run tests
+      - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
       - name: Verify packaging scripts parse
         run: bash -n packaging/build-packages.sh
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi python3-cairo gir1.2-gtk-4.0 gir1.2-adw-1 xvfb
+
+      - name: Application import smoke test
+        run: |
+          xvfb-run -a python3 -c "
+          import sys
+          sys.path.insert(0, 'src')
+          import app
+          import window
+          import pages.device
+          import pages.dashboard
+          print('All application modules imported successfully with GUI dependencies')
+          "

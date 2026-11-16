@@ -29,7 +29,7 @@ Hardware support varies by laptop and firmware. Unsupported controls are not emu
 
 ## Requirements
 
-- A Linux desktop with Python 3, GTK 4, libadwaita, and PyGObject.
+- A Linux desktop with Python 3, GTK 4, libadwaita, PyGObject, and Pycairo.
 - `asusctl` for ASUS profile, battery, and keyboard-lighting controls.
 - `supergfxctl` for GPU mode switching.
 - `ps` (from `procps`) for the Running Applications view.
@@ -42,7 +42,7 @@ Run the installer from the downloaded or cloned project directory:
 ./install.sh
 ```
 
-The installer checks for `asusctl`, `supergfxctl`, GTK 4, libadwaita, PyGObject, `pciutils`, and `procps`. It supports APT, DNF/YUM, Pacman, Zypper, APK, XBPS, Emerge, and Eopkg based distributions. It asks before installing missing packages and uses `sudo` for system package operations. On Fedora it offers the Terra repository; on Arch it offers the signed OGC repository. Other distributions need the ASUS utility packages available in their configured repositories. NixOS needs its declarative service configuration, so the installer reports that requirement instead of editing `/etc/nixos` automatically. ASUS Linux's supported distro list and package availability change over time; check its [current distro documentation](https://github.com/OpenGamingCollective/asusctl/blob/main/docs/getting-started/supported-distributions.md) if a package is missing. Hardware support also depends on the laptop model, kernel, and firmware.
+The installer checks for `asusctl`, `supergfxctl`, GTK 4, libadwaita, PyGObject, Pycairo, `pciutils`, and `procps`. It supports APT, DNF/YUM, Pacman, Zypper, APK, XBPS, Emerge, and Eopkg based distributions. It asks before installing missing packages and uses `sudo` for system package operations. On Fedora it offers the Terra repository; on Arch it offers the signed OGC repository. Other distributions need the ASUS utility packages available in their configured repositories. NixOS needs its declarative service configuration, so the installer reports that requirement instead of editing `/etc/nixos` automatically. ASUS Linux's supported distro list and package availability change over time; check its [current distro documentation](https://github.com/OpenGamingCollective/asusctl/blob/main/docs/getting-started/supported-distributions.md) if a package is missing. Hardware support also depends on the laptop model, kernel, and firmware.
 
 The app is installed in the current user's `~/.local` directories. To remove it:
 

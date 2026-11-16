@@ -283,15 +283,15 @@ class ArmouryWindow(
             )
             self.dashboard_stat_meter_values["gpu_frequency"] = gpu_frequency
             self.dashboard_stat_meters["gpu_frequency"].queue_draw()
-            memory_frequency = gpu_memory_freq_mhz()
+            memory_frequency = gpu.get("memory_frequency") or (gpu_memory_freq_mhz() if gpu.get("vendor") == "amd" else None)
             self.dashboard_values["gpu_memory_frequency"].set_text(
                 f"{memory_frequency} MHz" if memory_frequency is not None else "Unavailable"
             )
-            gpu_voltage = gpu_voltage_mv()
+            gpu_voltage = gpu.get("voltage")
             self.dashboard_values["gpu_voltage"].set_text(
                 f"{gpu_voltage} mV" if gpu_voltage is not None else "Unavailable"
             )
-            gpu_power = gpu_power_watts()
+            gpu_power = gpu.get("power")
             vendor = gpu.get("vendor", "")
             power_label = "AMD PPT" if vendor == "amd" else "TGP"
             self.dashboard_values["gpu_tgp"].set_text(

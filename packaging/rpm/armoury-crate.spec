@@ -6,10 +6,12 @@ License:        MIT
 URL:            https://github.com/Shinkhal/armoury_crate_linux
 BuildArch:      noarch
 Requires:       python3-gobject
+Requires:       python3-cairo
 Requires:       gtk4
 Requires:       libadwaita
 Requires:       asusctl
 Requires:       supergfxctl
+Requires:       smartmontools
 Requires:       pciutils
 Requires:       procps-ng
 
@@ -35,6 +37,15 @@ install -Dpm 0644 %{_sourcedir}/armoury-crate.svg %{buildroot}%{_datadir}/icons/
 %{_datadir}/icons/hicolor/scalable/apps/armoury-crate.svg
 
 %changelog
+* Mon Nov 16 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.3.0-1
+- Add the Device Details view with CPU, memory, GPU, and storage telemetry
+- Persist SMART data until the user requests a refresh and install smartmontools
+- Improve hybrid GPU telemetry, battery aggregation, and application smoke checks
+
+* Mon Nov 16 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.9-1
+- Add Pycairo dependency, correct mixed-unit battery percentage calculation,
+  fix hybrid GPU selection and vendor attribution, and add CI import smoke tests
+
 * Mon Nov 16 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.8-1
 - Fix mixed-unit battery aggregation, GPU device identification, sensor
   label validation, and restore dashboard scrolling

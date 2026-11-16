@@ -76,6 +76,7 @@ check_source_files() {
 check_python_gtk() {
     command -v python3 >/dev/null 2>&1 || return 1
     python3 - <<'PY' >/dev/null 2>&1
+import cairo
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
@@ -85,15 +86,17 @@ PY
 
 missing_runtime_packages() {
     local -a candidates=()
-    local -a commands=(asusctl supergfxctl lspci ps)
+    local -a commands=(asusctl supergfxctl lspci ps smartctl)
     local command_name
     for command_name in "${commands[@]}"; do
         if ! command -v "$command_name" >/dev/null 2>&1; then
             case "$command_name:$PKG_FAMILY" in
                 lspci:gentoo) candidates+=(sys-apps/pciutils) ;;
                 ps:gentoo) candidates+=(sys-process/procps) ;;
+                smartctl:gentoo) candidates+=(sys-apps/smartmontools) ;;
                 lspci:*) candidates+=(pciutils) ;;
                 ps:*) candidates+=(procps) ;;
+                smartctl:*) candidates+=(smartmontools) ;;
                 *) candidates+=("$command_name") ;;
             esac
         fi
@@ -101,16 +104,16 @@ missing_runtime_packages() {
     if ! command -v python3 >/dev/null 2>&1; then candidates+=(python3); fi
     if ! check_python_gtk; then
         case "$PKG_FAMILY" in
-            debian) candidates+=(python3-gi gir1.2-gtk-4.0 gir1.2-adw-1) ;;
-            fedora) candidates+=(python3-gobject gtk4 libadwaita) ;;
-            arch) candidates+=(python-gobject gtk4 libadwaita) ;;
-            suse) candidates+=(python3-gobject typelib-1_0-Gtk-4_0 typelib-1_0-Adw-1) ;;
-            alpine) candidates+=(py3-gobject3 gtk4 libadwaita) ;;
-            void) candidates+=(python3-gobject gtk4 libadwaita) ;;
-            gentoo) candidates+=(dev-python/pygobject gui-libs/gtk gui-libs/libadwaita) ;;
-            solus) candidates+=(python3-gobject gtk4 libadwaita) ;;
-            nix) candidates+=(python3Packages.pygobject3 gtk4 libadwaita) ;;
-            *) candidates+=(python3-gi gir1.2-gtk-4.0 gir1.2-adw-1) ;;
+            debian) candidates+=(python3-gi python3-cairo gir1.2-gtk-4.0 gir1.2-adw-1) ;;
+            fedora) candidates+=(python3-gobject python3-cairo gtk4 libadwaita) ;;
+            arch) candidates+=(python-gobject python-cairo gtk4 libadwaita) ;;
+            suse) candidates+=(python3-gobject python3-cairo typelib-1_0-Gtk-4_0 typelib-1_0-Adw-1) ;;
+            alpine) candidates+=(py3-gobject3 py3-cairo gtk4 libadwaita) ;;
+            void) candidates+=(python3-gobject python3-cairo gtk4 libadwaita) ;;
+            gentoo) candidates+=(dev-python/pygobject dev-python/pycairo gui-libs/gtk gui-libs/libadwaita) ;;
+            solus) candidates+=(python3-gobject python-cairo gtk4 libadwaita) ;;
+            nix) candidates+=(python3Packages.pygobject3 python3Packages.pycairo gtk4 libadwaita) ;;
+            *) candidates+=(python3-gi python3-cairo gir1.2-gtk-4.0 gir1.2-adw-1) ;;
         esac
     fi
     if ((${#candidates[@]})); then
@@ -203,10 +206,10 @@ install_packages() {
             "${privilege[@]}" eopkg install "${packages[@]}"
             ;;
         nix)
-            fail "NixOS manages system services declaratively. Add asusctl and supergfxctl to your NixOS configuration and enable their services, then rerun ./install.sh."
+            fail "NixOS manages system services declaratively. Add asusctl, supergfxctl and smartmontools to your NixOS configuration and enable their services, then rerun ./install.sh."
             ;;
         *)
-            fail "No supported package manager was detected for '$ID'. Install GTK 4, libadwaita, PyGObject, pciutils, procps, asusctl and supergfxctl with your distro's package manager, then rerun ./install.sh."
+            fail "No supported package manager was detected for '$ID'. Install GTK 4, libadwaita, PyGObject, pciutils, procps, smartmontools, asusctl and supergfxctl with your distro's package manager, then rerun ./install.sh."
             ;;
     esac
 }
@@ -214,7 +217,7 @@ install_packages() {
 verify_runtime() {
     local missing=()
     local command_name
-    for command_name in asusctl supergfxctl lspci ps; do
+    for command_name in asusctl supergfxctl lspci ps smartctl; do
         command -v "$command_name" >/dev/null 2>&1 || missing+=("$command_name")
     done
     ((${#missing[@]} == 0)) || fail "Required commands are still unavailable: ${missing[*]}. Install both ASUS control tools from the repositories or instructions for your distribution, then rerun ./install.sh. See https://asus-linux.org/guides/ and https://github.com/OpenGamingCollective/asusctl."

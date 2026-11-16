@@ -55,8 +55,8 @@ class BatteryAggregationTests(unittest.TestCase):
         with glob_patch, text_patch:
             self.assertEqual(system.read_battery_state(), (62, "Discharging", 375))
 
-    def test_battery_mixed_units_uses_weighted_percentage(self):
-        """Mixed energy/charge batteries must not sum raw values."""
+    def test_battery_mixed_units_uses_arithmetic_mean(self):
+        """Mixed energy/charge batteries must use the arithmetic mean of individual percentages."""
         paths = ["/sys/class/power_supply/BAT0", "/sys/class/power_supply/BAT1"]
         values = {
             (paths[0], "capacity"): "50", (paths[0], "status"): "Discharging",
@@ -70,9 +70,8 @@ class BatteryAggregationTests(unittest.TestCase):
         glob_patch, text_patch = self._mock_batteries(paths, values)
         with glob_patch, text_patch:
             capacity, status, eta = system.read_battery_state()
-            self.assertIsNotNone(capacity)
-            # Naive (25000+4000)/(50000+5000) = 52% which incorrectly mixes µWh and µAh.
-            self.assertNotEqual(capacity, 52)
+            # BAT0: 50%, BAT1: 80% -> unweighted arithmetic mean is exactly (50 + 80) // 2 = 65%
+            self.assertEqual(capacity, 65)
             self.assertEqual(status, "Discharging")
             # Cannot compute ETA across mixed units.
             self.assertIsNone(eta)
@@ -181,6 +180,79 @@ class GpuClassifyTests(unittest.TestCase):
     def test_classify_unknown(self):
         with patch.object(system, "text", return_value="—"):
             self.assertEqual(system._classify_gpu("/sys/class/drm/card0/device"), "unknown")
+
+
+class GpuTelemetryTests(unittest.TestCase):
+    def setUp(self):
+        system._nvidia_gpu_cache = None
+        system._nvidia_gpu_cache_time = 0.0
+
+    def test_gpu_telemetry_prefers_nvidia_on_hybrid(self):
+        """On hybrid laptops with card0=AMD (iGPU) and card1=NVIDIA (dGPU), pick NVIDIA."""
+        devices = ["/sys/class/drm/card0/device", "/sys/class/drm/card1/device"]
+        mock_data = {
+            f"{devices[0]}/vendor": "0x1002",
+            f"{devices[0]}/gt_cur_freq_mhz": "1200",
+            f"{devices[0]}/gpu_busy_percent": "15",
+            f"{devices[0]}/mem_info_vram_used": "512",
+            f"{devices[0]}/mem_info_vram_total": "512",
+            f"{devices[1]}/vendor": "0x10de",
+            f"{devices[1]}/gt_cur_freq_mhz": "1950",
+            f"{devices[1]}/gpu_busy_percent": "78",
+            f"{devices[1]}/mem_info_vram_used": "4096",
+            f"{devices[1]}/mem_info_vram_total": "8192",
+        }
+        with patch.object(system.glob, "glob", return_value=devices), \
+             patch.object(system, "text", side_effect=lambda path, default="—": mock_data.get(path, default)), \
+             patch.object(system, "read_thermal", return_value=62.0):
+            telemetry = system.gpu_telemetry()
+            self.assertEqual(telemetry["vendor"], "nvidia")
+            self.assertEqual(telemetry["frequency"], 1950)
+            self.assertEqual(telemetry["usage"], 78)
+            self.assertEqual(telemetry["memory_total"], 8192)
+            # NVIDIA should not receive AMD voltage
+            self.assertIsNone(telemetry["voltage"])
+
+    def test_gpu_telemetry_amd_system(self):
+        """On AMD-only system, report AMD vendor, temperature, voltage and power."""
+        devices = ["/sys/class/drm/card0/device"]
+        mock_data = {
+            f"{devices[0]}/vendor": "0x1002",
+            f"{devices[0]}/gt_cur_freq_mhz": "1600",
+            f"{devices[0]}/gpu_busy_percent": "45",
+            f"{devices[0]}/mem_info_vram_used": "1024",
+            f"{devices[0]}/mem_info_vram_total": "4096",
+        }
+        with patch.object(system.glob, "glob", return_value=devices), \
+             patch.object(system, "text", side_effect=lambda path, default="—": mock_data.get(path, default)), \
+             patch.object(system, "read_thermal", return_value=58.0), \
+             patch.object(system, "gpu_power_watts", return_value=35.5), \
+             patch.object(system, "gpu_voltage_mv", return_value=875):
+            telemetry = system.gpu_telemetry()
+            self.assertEqual(telemetry["vendor"], "amd")
+            self.assertEqual(telemetry["frequency"], 1600)
+            self.assertEqual(telemetry["power"], 35.5)
+            self.assertEqual(telemetry["voltage"], 875)
+
+    def test_gpu_telemetry_nvidia_cache_overrides_vendor_and_clears_voltage(self):
+        """When NVIDIA cache is active, vendor must be nvidia and voltage must be None."""
+        import time
+        system._nvidia_gpu_cache = {
+            "vendor": "nvidia",
+            "usage": 85.0,
+            "temperature": 71.0,
+            "frequency": 2100.0,
+            "memory_used": 6000000000,
+            "memory_total": 8000000000,
+            "power": 115.0,
+        }
+        system._nvidia_gpu_cache_time = time.monotonic()
+        with patch.object(system.glob, "glob", return_value=[]):
+            telemetry = system.gpu_telemetry()
+            self.assertEqual(telemetry["vendor"], "nvidia")
+            self.assertEqual(telemetry["power"], 115.0)
+            self.assertEqual(telemetry["frequency"], 2100.0)
+            self.assertIsNone(telemetry["voltage"])
 
 
 class HelperTests(unittest.TestCase):

@@ -12,8 +12,10 @@ from config import DEVICE_MONITOR_REFRESH_SECONDS
 from components.widgets import label
 from hardware.asus import fan_hwmon, fan_read, rpm
 from hardware.system import (
-    cpu_freq_ghz, format_bytes, gpu_telemetry, memory_details,
-    read_disk_active_ms, read_disk_io_bytes, read_thermal,
+    cpu_freq_ghz, cpu_max_freq_ghz, cpu_model, cpu_topology, cpu_usage_percent,
+    format_bytes, gpu_names, gpu_telemetry, integrated_gpu_telemetry, memory_details,
+    read_disk_active_ms, read_disk_io_bytes, read_thermal, storage_devices,
+    storage_smart_refreshing,
     top_processes,
 )
 
@@ -53,6 +55,7 @@ class DevicePage:
         self.device_previous_disk = None
         self.device_previous_disk_active = None
         self.device_process_refresh_counter = 0
+        self.device_details_refresh_counter = 0
         self.device_cpu_times = None
         self.device_recording = False
         self.device_recording_started = None
@@ -64,7 +67,7 @@ class DevicePage:
         tabs = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         tabs.add_css_class("device-tabs")
         self.device_tab_buttons = {}
-        for key, title in (("monitor", "Resource Monitor"), ("applications", "Running Applications")):
+        for key, title in (("monitor", "Resource Monitor"), ("applications", "Running Applications"), ("details", "Device Details")):
             button = Gtk.ToggleButton(label=title)
             button.add_css_class("device-tab")
             button.connect("toggled", self.on_device_tab_toggled, key)
@@ -76,8 +79,10 @@ class DevicePage:
         self.device_content_stack.set_vexpand(True)
         self.device_monitor_page = self._build_resource_monitor()
         self.device_applications_page = self._build_applications_page()
+        self.device_details_page = self._build_device_details_page()
         self.device_content_stack.add_named(self.device_monitor_page, "monitor")
         self.device_content_stack.add_named(self.device_applications_page, "applications")
+        self.device_content_stack.add_named(self.device_details_page, "details")
         content.append(self.device_content_stack)
         self.device_tab_buttons["monitor"].set_active(True)
         self.on_device_level_changed(self.device_level_dropdown, None)
@@ -232,6 +237,267 @@ class DevicePage:
         page.append(main)
 
         return page
+
+    def _build_device_details_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        page.set_margin_top(18)
+        page.set_margin_bottom(14)
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        header.append(label("DEVICE DETAILS", "resource-metrics-heading"))
+        header.append(Gtk.Box(hexpand=True))
+        self.device_details_updated = label("SMART cached", "device-resource-detail")
+        self.device_details_updated.set_single_line_mode(True)
+        self.device_details_updated.set_ellipsize(3)
+        self.device_details_updated.set_tooltip_text("SMART data is saved on this device and stays cached until you request a refresh.")
+        header.append(self.device_details_updated)
+        self.device_smart_refresh_button = Gtk.Button(label="Refresh SMART")
+        self.device_smart_refresh_button.add_css_class("resource-record-button")
+        self.device_smart_refresh_button.connect("clicked", self.on_device_smart_refresh_clicked)
+        header.append(self.device_smart_refresh_button)
+        page.append(header)
+
+        grid = Gtk.Grid(column_spacing=28, row_spacing=0)
+        grid.set_column_homogeneous(True)
+        self.device_detail_values = {}
+        self.device_detail_rows = {}
+        self.device_detail_cards = {}
+        for index, (key, title, row_names) in enumerate((
+            ("cpu", "PROCESSOR", ("Model", "Physical cores", "Logical threads", "Current frequency", "Max frequency", "Boost", "Usage", "Temperature")),
+            ("memory", "MEMORY", ("Total (OS)", "In use", "Available", "Usage", "Swap used", "Swap total")),
+            ("gpu", "GRAPHICS", ("Discrete GPU", "Integrated GPU", "Active GPU", "Usage", "Frequency", "Temperature", "VRAM used", "VRAM total", "Power", "Integrated GPU load", "Integrated GPU clock", "Integrated GPU memory", "Integrated GPU temp")),
+        )):
+            icon_name = {"cpu": "cpu-symbolic", "memory": "memory-symbolic", "gpu": "video-display-symbolic"}[key]
+            wide = key == "gpu"
+            card, values, rows = self._device_detail_card(title, row_names, icon_name, wide=wide)
+            card.add_css_class(f"device-details-{key}")
+            self.device_detail_cards[key] = card
+            self.device_detail_values[key] = values
+            self.device_detail_rows[key] = rows
+            if key in ("cpu", "memory"):
+                grid.attach(card, index, 0, 1, 1)
+            else:
+                grid.attach(card, 0, 1, 2, 1)
+        storage_card, self.device_storage_box = self._device_storage_card()
+        grid.attach(storage_card, 0, 2, 2, 1)
+        page.append(grid)
+        self._refresh_device_details()
+        return page
+
+    def _device_detail_card(self, title, names, icon_name, wide=False):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        card.add_css_class("device-details-section")
+        heading = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+        heading.add_css_class("device-details-heading")
+        icon = self._device_icon(icon_name, "computer-symbolic", 17)
+        heading.append(icon)
+        heading.append(label(title, "resource-metrics-heading"))
+        card.append(heading)
+        values = {}
+        rows = {}
+        metrics = Gtk.Grid(column_spacing=28 if wide else 0, row_spacing=3)
+        metrics.set_column_homogeneous(wide)
+        card.append(metrics)
+        columns = 2 if wide else 1
+        for index, name in enumerate(names):
+            field = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            key_label = label(name, "device-detail-name")
+            key_label.set_hexpand(True)
+            field.append(key_label)
+            value = label("—", "device-detail-value")
+            value.set_halign(Gtk.Align.END)
+            value.set_ellipsize(3)
+            field.append(value)
+            metrics.attach(field, index % columns, index // columns, 1, 1)
+            values[name] = value
+            rows[name] = field
+        return card, values, rows
+
+    @staticmethod
+    def _device_icon(icon_name, fallback, size):
+        theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        icon = Gtk.Image.new_from_icon_name(icon_name if theme.has_icon(icon_name) else fallback)
+        icon.set_pixel_size(size)
+        icon.add_css_class("device-details-icon")
+        return icon
+
+    def _device_storage_card(self):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card.add_css_class("device-details-section")
+        card.add_css_class("device-details-storage")
+        heading = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+        heading.append(self._device_icon("drive-harddisk-symbolic", "drive-harddisk", 17))
+        heading.append(label("STORAGE DEVICES", "resource-metrics-heading"))
+        card.append(heading)
+        devices = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        card.append(devices)
+        return card, devices
+
+    def on_device_smart_refresh_clicked(self, _button):
+        self.device_details_updated.set_text("Refreshing SMART data…")
+        self.device_smart_refresh_button.set_sensitive(False)
+        self._refresh_device_details(refresh_smart=True)
+
+    def _refresh_device_details(self, refresh_smart=False):
+        if not hasattr(self, "device_detail_values"):
+            return
+        memory = memory_details()
+        total = memory.get("MemTotal")
+        available = memory.get("MemAvailable")
+        swap_total = memory.get("SwapTotal")
+        swap_free = memory.get("SwapFree")
+        total_bytes = total * 1024 if total is not None else None
+        available_bytes = available * 1024 if available is not None else None
+        gpu = gpu_telemetry()
+        integrated_gpu = integrated_gpu_telemetry()
+        dgpu, igpu = gpu_names()
+        temp = gpu.get("temperature")
+        active_gpu = gpu.get("vendor") or "Unavailable"
+        active_gpu = active_gpu.upper() if active_gpu != "Unavailable" else active_gpu
+        topology = cpu_topology()
+        cpu_temperature = read_thermal("k10temp")
+        if cpu_temperature is None:
+            cpu_temperature = read_thermal("acpitz") or read_thermal("coretemp")
+        gpu_used = gpu.get("memory_used")
+        gpu_total = gpu.get("memory_total")
+        frequency = cpu_freq_ghz()
+        max_frequency = cpu_max_freq_ghz()
+        swap_used = max(0, swap_total - swap_free) if swap_total is not None and swap_free is not None else None
+        values = {
+            "cpu": {
+                "Model": cpu_model(),
+                "Physical cores": str(topology["cores"]),
+                "Logical threads": str(topology["logical"]),
+                "Current frequency": f"{frequency:.2f} GHz" if frequency else "Unavailable",
+                "Max frequency": f"{max_frequency:.2f} GHz" if max_frequency else "Unavailable",
+                "Boost": topology["boost"],
+                "Usage": self._device_percent_text(cpu_usage_percent()),
+                "Temperature": self._device_temp_text(cpu_temperature),
+            },
+            "memory": {
+                "Total (OS)": format_bytes(total_bytes),
+                "In use": format_bytes(max(0, total_bytes - available_bytes) if total_bytes is not None and available_bytes is not None else None),
+                "Available": format_bytes(available_bytes),
+                "Usage": self._device_percent_text((total - available) * 100 / total if total and available is not None else None),
+                "Swap used": format_bytes(swap_used * 1024 if swap_used is not None else None),
+                "Swap total": format_bytes(swap_total * 1024 if swap_total is not None else None),
+            },
+            "gpu": {
+                "Discrete GPU": dgpu,
+                "Integrated GPU": igpu,
+                "Active GPU": active_gpu,
+                "Usage": self._device_percent_text(gpu.get("usage")),
+                "Frequency": f"{gpu['frequency']:.0f} MHz" if gpu.get("frequency") is not None else "Unavailable",
+                "Temperature": self._device_temp_text(temp),
+                "VRAM used": format_bytes(gpu_used),
+                "VRAM total": format_bytes(gpu_total),
+                "Power": f"{gpu['power']:.1f} W" if gpu.get("power") is not None else "Unavailable",
+                "Integrated GPU load": self._device_percent_text(integrated_gpu.get("usage")),
+                "Integrated GPU clock": f"{integrated_gpu['frequency']} MHz" if integrated_gpu.get("frequency") is not None else "Unavailable",
+                "Integrated GPU memory": (
+                    f"{format_bytes(integrated_gpu.get('memory_used'))} / {format_bytes(integrated_gpu.get('memory_total'))}"
+                    if integrated_gpu.get("memory_used") is not None and integrated_gpu.get("memory_total") is not None
+                    else "Unavailable"
+                ),
+                "Integrated GPU temp": self._device_temp_text(read_thermal("amdgpu")),
+            },
+        }
+        for section, rows in values.items():
+            for name, value in rows.items():
+                self.device_detail_values[section][name].set_text(value)
+                self.device_detail_values[section][name].set_tooltip_text(value)
+                self.device_detail_rows[section][name].set_visible(value != "Unavailable")
+        while child := self.device_storage_box.get_first_child():
+            self.device_storage_box.remove(child)
+        drives = storage_devices(refresh_smart=refresh_smart)
+        if not drives:
+            self.device_storage_box.append(label("No physical storage devices detected.", "device-resource-detail"))
+        for drive in drives:
+            smart = drive["smart"]
+            model = f"{drive['model']} · /dev/{drive['name']}"
+            detail_rows = [
+                ("Type", drive["kind"]),
+                ("Capacity", format_bytes(drive["capacity"])),
+            ]
+            has_smart = smart.get("health") not in (None, "Unavailable") or any(
+                smart.get(key) is not None for key in (
+                    "temperature", "percentage_used", "available_spare", "power_on_hours",
+                    "media_errors", "data_read_bytes", "data_written_bytes",
+                )
+            )
+            if has_smart:
+                detail_rows.append(("Health", smart.get("health", "Available")))
+                if smart.get("temperature") is not None:
+                    detail_rows.append(("Temperature", self._device_temp_text(smart["temperature"])))
+                if smart.get("percentage_used") is not None:
+                    detail_rows.append(("Life used", f"{smart['percentage_used']}%"))
+                if smart.get("available_spare") is not None:
+                    detail_rows.append(("Available spare", f"{smart['available_spare']}%"))
+                if smart.get("power_on_hours") is not None:
+                    detail_rows.append(("Power on", f"{smart['power_on_hours']} hours"))
+                if smart.get("media_errors") is not None:
+                    detail_rows.append(("Media errors", str(smart["media_errors"])))
+                if smart.get("data_read_bytes") is not None:
+                    detail_rows.append(("Host reads", format_bytes(smart["data_read_bytes"])))
+                if smart.get("data_written_bytes") is not None:
+                    detail_rows.append(("Host writes", format_bytes(smart["data_written_bytes"])))
+            else:
+                detail_rows.append(("SMART status", "Reading…" if storage_smart_refreshing() else "Not available"))
+                detail_rows.append((
+                    "Details",
+                    smart.get("error") or "Click Refresh SMART to retry with admin access.",
+                ))
+            drive_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
+            drive_card.add_css_class("device-storage-row")
+            drive_heading = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=9)
+            drive_icon = self._device_icon("drive-harddisk-symbolic", "drive-harddisk", 16)
+            drive_heading.append(drive_icon)
+            model_label = label(model, "device-detail-value")
+            model_label.set_ellipsize(3)
+            model_label.set_tooltip_text(model)
+            drive_heading.append(model_label)
+            drive_card.append(drive_heading)
+            drive_grid = Gtk.Grid(column_spacing=24, row_spacing=5)
+            for index, (name, value) in enumerate(detail_rows):
+                column = (index % 2) * 2
+                row_index = index // 2
+                drive_grid.attach(label(name, "device-detail-name"), column, row_index, 1, 1)
+                val = label(value, "device-detail-value")
+                val.set_hexpand(True)
+                val.set_halign(Gtk.Align.END)
+                val.set_ellipsize(3)
+                val.set_max_width_chars(48)
+                val.set_tooltip_text(value)
+                drive_grid.attach(val, column + 1, row_index, 1, 1)
+            drive_card.append(drive_grid)
+            self.device_storage_box.append(drive_card)
+        if storage_smart_refreshing():
+            self.device_details_updated.set_text("Reading SMART data…")
+            self.device_smart_refresh_button.set_sensitive(False)
+        else:
+            smart_available = any(drive["smart"].get("health") not in (None, "Unavailable") for drive in drives)
+            permission_needed = any(
+                "permission" in drive["smart"].get("error", "").lower()
+                or "denied" in drive["smart"].get("error", "").lower()
+                for drive in drives
+            )
+            self.device_details_updated.set_text(
+                "SMART cached" if smart_available else
+                ("SMART access needed" if permission_needed else "SMART unavailable")
+            )
+            self.device_details_updated.set_tooltip_text(
+                "SMART results are cached. Click Refresh SMART to authorize a new read."
+                if permission_needed else
+                "SMART results are saved on this device until you click Refresh SMART."
+            )
+            self.device_smart_refresh_button.set_sensitive(True)
+
+    @staticmethod
+    def _device_temp_text(value):
+        return f"{value:.0f} °C" if isinstance(value, (int, float)) else "Unavailable"
+
+    @staticmethod
+    def _device_percent_text(value):
+        return f"{value:.0f}%" if isinstance(value, (int, float)) else "Unavailable"
 
     def _on_chart_motion(self, _controller, x, y):
         self.device_chart_hover_x = x
@@ -401,10 +667,12 @@ class DevicePage:
             "gpu_fan": gpu_fan,
         }
         if self.device_recording:
+            interval = max(0.1, DEVICE_MONITOR_REFRESH_SECONDS)
+            max_history = max(60, int(round((10 * 60) / interval)))
             for key, value in values.items():
                 history = self.device_history[key]
                 history.append(value)
-                del history[:-600]
+                del history[:-max_history]
             if self.device_chart is not None:
                 self.device_chart.queue_draw()
 
@@ -416,6 +684,9 @@ class DevicePage:
             self.device_recording_label.set_text(f"●  RECORDING  {minutes:02d}:{seconds:02d}")
 
         self.device_process_refresh_counter += 1
+        self.device_details_refresh_counter += 1
+        if self.device_details_refresh_counter % 5 == 1:
+            self._refresh_device_details()
         if self.device_process_refresh_counter % 4 == 1:
             self.device_process_summary.set_text("Live · sorted by CPU")
             processes = top_processes(len(self.device_process_rows))
@@ -455,7 +726,8 @@ class DevicePage:
     def _visible_sample_count(self):
         selection = self.device_time_view.get_selected()
         minutes = (1, 5, 10)[selection if selection < 3 else 1]
-        return minutes * 60
+        interval = max(0.1, DEVICE_MONITOR_REFRESH_SECONDS)
+        return max(2, int(round((minutes * 60) / interval)))
 
     def draw_resource_chart(self, _area, context, width, height):
         # Margins: extra left for Y-axis label, extra bottom for X-axis label
@@ -463,7 +735,8 @@ class DevicePage:
         plot_height = bottom - top
         plot_width = right - left
         visible_count = self._visible_sample_count()
-        minutes = visible_count // 60
+        selection = self.device_time_view.get_selected()
+        minutes = (1, 5, 10)[selection if selection < 3 else 1]
 
         # ── Background ──
         context.set_source_rgb(0.020, 0.030, 0.045)

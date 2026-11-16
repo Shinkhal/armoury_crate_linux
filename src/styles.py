@@ -144,6 +144,16 @@ window .resource-metric-dot { min-width: 14px; font-size: 10px; }
 window .resource-metric-name { color: #c0c9d6; font-size: 11px; font-weight: 500; }
 window .resource-metric-value { min-width: 68px; color: #f0f3f8; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 window .applications-panel { padding: 18px 20px; background: linear-gradient(145deg, #0c1119, #0e1420); border: 1px solid #2a3240; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.3); }
+window .device-details-section { min-width: 260px; padding: 14px 4px 16px; }
+window .device-details-cpu { padding-right: 22px; border-right: 1px solid #252d39; }
+window .device-details-memory { padding-left: 22px; }
+window .device-details-gpu { margin-top: 2px; border-top: 1px solid #252d39; }
+window .device-details-storage { border-top: 1px solid #252d39; }
+window .device-details-heading { min-height: 26px; margin-bottom: 8px; }
+window .device-details-icon { color: #e52b45; }
+window .device-detail-name { min-width: 126px; color: #7d8a9d; font-size: 11px; }
+window .device-detail-value { color: #e5e8ed; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+window .device-storage-row { padding: 10px 0; border-top: 1px solid rgba(120,130,150,.16); }
 window .applications-heading { min-height: 42px; margin-bottom: 12px; }
 window .applications-list-headings { min-height: 38px; padding: 0 14px; border-bottom: 1px solid #353e4d; }
 window .device-process-column { color: #7d8a9d; font-size: 9px; font-weight: 800; letter-spacing: 1px; }

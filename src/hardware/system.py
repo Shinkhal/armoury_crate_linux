@@ -1,6 +1,9 @@
 """Linux hardware telemetry and system identity discovery."""
 import glob
+import json
 import os
+import re
+import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -14,23 +17,35 @@ _nvidia_gpu_future = None
 _nvidia_gpu_last_started = 0.0
 _nvidia_gpu_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nvidia-telemetry")
 _NVIDIA_GPU_CACHE_TTL = 8.0
+_smart_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="smart-storage")
+_smart_future = None
+_smart_future_names = set()
+_smart_cache = {}
+_smart_queried = set()
+_smart_disk_cache = {}
+_smart_cache_loaded = False
+_smart_identity_by_name = {}
 
 
 def _query_nvidia_gpu():
     return command([
         "nvidia-smi",
-        "--query-gpu=utilization.gpu,temperature.gpu,clocks.gr,memory.used,memory.total",
+        "--query-gpu=utilization.gpu,temperature.gpu,clocks.gr,memory.used,memory.total,power.draw",
         "--format=csv,noheader,nounits",
     ], timeout=2)
 
 
 def shutdown_telemetry():
     """Stop background telemetry work during application shutdown."""
-    global _nvidia_gpu_future
+    global _nvidia_gpu_future, _smart_future
     if _nvidia_gpu_future is not None and not _nvidia_gpu_future.done():
         _nvidia_gpu_future.cancel()
     _nvidia_gpu_future = None
     _nvidia_gpu_executor.shutdown(wait=False, cancel_futures=True)
+    if _smart_future is not None and not _smart_future.done():
+        _smart_future.cancel()
+    _smart_future = None
+    _smart_executor.shutdown(wait=False, cancel_futures=True)
 
 
 def read_memory():
@@ -98,16 +113,14 @@ def read_battery_state():
         total_remaining = sum(item["remaining"] for item in batteries)
         capacity = round(total_remaining * 100 / total_full) if total_full else None
     else:
-        # Mixed units — compute a weighted average from each battery's own
-        # capacity percentage, weighted by its full capacity in its own unit.
-        # This avoids adding incompatible physical quantities.
-        weighted_sum = sum(
-            (item["remaining"] / item["full"] * 100) * item["full"]
+        # Mixed units (energy vs charge) cannot be physically aggregated.
+        # Fall back to the arithmetic mean of the individual battery percentages.
+        individual_capacities = [
+            item["capacity"] if item["capacity"] is not None
+            else round(item["remaining"] * 100 / item["full"])
             for item in batteries if item["full"] > 0
-        )
-        weight_total = sum(item["full"] for item in batteries if item["full"] > 0)
-        capacity = round(weighted_sum / weight_total) if weight_total else None
-        # Raw sums are invalid across mixed units.
+        ]
+        capacity = round(sum(individual_capacities) / len(individual_capacities)) if individual_capacities else None
         total_remaining = total_full = None
 
     statuses = {item["status"].lower() for item in batteries}
@@ -148,6 +161,164 @@ def read_disks():
     return disks
 
 
+def _query_smart_devices(devices, elevated=False):
+    """Read SMART summary fields off the GTK thread."""
+    results = {}
+    for device in devices:
+        device_path = f"/dev/{device['name']}"
+        smartctl = shutil.which("smartctl") or "smartctl"
+        args = [smartctl, "-a", "-j", device_path]
+        if elevated and shutil.which("pkexec"):
+            args.insert(0, shutil.which("pkexec"))
+        result = command(args, timeout=60 if elevated else 4)
+        try:
+            payload = json.loads(result.stdout)
+        except (TypeError, ValueError):
+            results[device["name"]] = {
+                "health": "Unavailable",
+                "error": result.stderr.strip() or "SMART data could not be read.",
+            }
+            continue
+        nvme = payload.get("nvme_smart_health_information_log", {})
+        ata = payload.get("ata_smart_attributes", {}).get("table", [])
+        attributes = {item.get("name", "").lower(): item.get("raw", {}).get("value") for item in ata}
+        messages = payload.get("smartctl", {}).get("messages", [])
+        error = " ".join(message.get("string", "") for message in messages).strip()
+        if any(token in f"{result.stderr} {error}".lower() for token in ("permission", "denied", "not authorized")):
+            error = "Permission denied. Use Refresh SMART to authorize a read."
+        results[device["name"]] = {
+            "health": "PASSED" if payload.get("smart_status", {}).get("passed") is True else (
+                "FAILED" if payload.get("smart_status", {}).get("passed") is False else "Unavailable"
+            ),
+            "error": error,
+            "temperature": nvme.get("temperature") or payload.get("temperature", {}).get("current"),
+            "percentage_used": nvme.get("percentage_used"),
+            "available_spare": nvme.get("available_spare"),
+            "power_on_hours": nvme.get("power_on_time", {}).get("hours") or attributes.get("power_on_hours"),
+            "data_read_bytes": (
+                nvme["data_units_read"] * 512_000
+                if isinstance(nvme.get("data_units_read"), (int, float)) else None
+            ),
+            "data_written_bytes": (
+                nvme["data_units_written"] * 512_000
+                if isinstance(nvme.get("data_units_written"), (int, float)) else None
+            ),
+            "media_errors": nvme.get("media_errors"),
+        }
+    return results
+
+
+def _smart_cache_path():
+    cache_root = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(cache_root, "armoury-crate", "smart-storage.json")
+
+
+def _load_smart_disk_cache():
+    global _smart_cache_loaded, _smart_disk_cache
+    if _smart_cache_loaded:
+        return
+    _smart_cache_loaded = True
+    try:
+        with open(_smart_cache_path(), encoding="utf-8") as stream:
+            payload = json.load(stream)
+        if payload.get("version") == 1 and isinstance(payload.get("drives"), dict):
+            _smart_disk_cache = {
+                name: entry for name, entry in payload["drives"].items()
+                if isinstance(entry, dict)
+                and isinstance(entry.get("identity"), str)
+                and isinstance(entry.get("smart"), dict)
+            }
+    except (OSError, ValueError, AttributeError):
+        _smart_disk_cache = {}
+
+
+def _save_smart_disk_cache():
+    cache_path = _smart_cache_path()
+    temporary_path = cache_path + ".tmp"
+    try:
+        os.makedirs(os.path.dirname(cache_path), mode=0o700, exist_ok=True)
+        with open(temporary_path, "w", encoding="utf-8") as stream:
+            json.dump({"version": 1, "drives": _smart_disk_cache}, stream, separators=(",", ":"))
+        os.chmod(temporary_path, 0o600)
+        os.replace(temporary_path, cache_path)
+    except OSError:
+        try:
+            os.unlink(temporary_path)
+        except OSError:
+            pass
+
+
+def _smart_drive_identity(device):
+    return "|".join((device["name"], device["vendor"], device["model"], str(device["capacity"])))
+
+
+def storage_devices(refresh_smart=False):
+    """Return physical drives and persistent SMART data, refreshing only on request."""
+    global _smart_future, _smart_future_names, _smart_cache, _smart_queried
+    _load_smart_disk_cache()
+    devices = []
+    try:
+        names = sorted(os.listdir("/sys/block"))
+    except OSError:
+        names = []
+    for name in names:
+        if name.startswith(("loop", "ram", "zram", "fd", "sr", "dm-")):
+            continue
+        size = int_or_none(text(f"/sys/block/{name}/size", ""))
+        if not size:
+            continue
+        model = text(f"/sys/block/{name}/device/model", "").strip()
+        vendor = text(f"/sys/block/{name}/device/vendor", "").strip()
+        rotational = text(f"/sys/block/{name}/queue/rotational", "1") == "1"
+        devices.append({
+            "name": name,
+            "model": model or name,
+            "vendor": vendor,
+            "capacity": size * 512,
+            "kind": "NVMe SSD" if name.startswith("nvme") else ("SSD" if not rotational else "HDD"),
+            "smart": _smart_cache.get(name, {}),
+        })
+    for device in devices:
+        name = device["name"]
+        identity = _smart_drive_identity(device)
+        _smart_identity_by_name[name] = identity
+        cached = _smart_disk_cache.get(name, {})
+        if cached.get("identity") == identity and isinstance(cached.get("smart"), dict):
+            _smart_cache[name] = cached["smart"]
+            _smart_queried.add(name)
+        elif cached:
+            _smart_disk_cache.pop(name, None)
+            _smart_cache.pop(name, None)
+    if _smart_future is not None and _smart_future.done():
+        try:
+            refreshed = _smart_future.result()
+            _smart_cache.update(refreshed)
+            for name, smart in refreshed.items():
+                identity = _smart_identity_by_name.get(name)
+                if identity:
+                    _smart_disk_cache[name] = {"identity": identity, "smart": smart}
+            _save_smart_disk_cache()
+        except Exception:
+            pass
+        _smart_queried.update(_smart_future_names)
+        _smart_future = None
+        _smart_future_names = set()
+    names = {device["name"] for device in devices}
+    if refresh_smart:
+        _smart_queried.difference_update(names)
+    unqueried = [device for device in devices if device["name"] not in _smart_queried | _smart_future_names]
+    if unqueried and _smart_future is None:
+        _smart_future_names = {device["name"] for device in unqueried}
+        _smart_future = _smart_executor.submit(_query_smart_devices, unqueried, refresh_smart)
+    for device in devices:
+        device["smart"] = _smart_cache.get(device["name"], {})
+    return devices
+
+
+def storage_smart_refreshing():
+    return _smart_future is not None and not _smart_future.done()
+
+
 def pretty_product_name(raw):
     name = raw.strip()
     if "_" in name:
@@ -172,6 +343,13 @@ def read_thermal(hwmon_name):
 
 
 def cpu_freq_ghz():
+    values = []
+    for path in glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq"):
+        value = int_or_none(text(path, ""))
+        if value is not None and value > 0:
+            values.append(value)
+    if values:
+        return sum(values) / len(values) / 1_000_000
     total = count = 0.0
     try:
         with open("/proc/cpuinfo", encoding="utf-8") as stream:
@@ -192,6 +370,26 @@ def cpu_max_freq_ghz():
         if value is not None and value > 0:
             values.append(value)
     return max(values) / 1_000_000 if values else None
+
+
+def cpu_topology():
+    """Return logical CPU count, distinct physical cores, and boost state."""
+    cpu_paths = glob.glob("/sys/devices/system/cpu/cpu[0-9]*")
+    logical = len(cpu_paths) or (os.cpu_count() or 0)
+    cores = set()
+    for path in cpu_paths:
+        package = int_or_none(text(os.path.join(path, "topology/physical_package_id"), ""))
+        core = int_or_none(text(os.path.join(path, "topology/core_id"), ""))
+        if core is not None:
+            cores.add((package or 0, core))
+    boost = text("/sys/devices/system/cpu/cpufreq/boost", "")
+    if not boost:
+        boost = text("/sys/devices/system/cpu/cpufreq/amd_pstate/cpb_boost", "")
+    return {
+        "logical": logical,
+        "cores": len(cores) or logical,
+        "boost": "Enabled" if boost == "1" else ("Disabled" if boost == "0" else "Unavailable"),
+    }
 
 
 def hwmon_sensor_value(hwmon_name, filename, label_name=None):
@@ -271,6 +469,31 @@ def gpu_usage_percent():
     return None
 
 
+def integrated_gpu_telemetry():
+    """Read kernel DRM telemetry for the non-NVIDIA GPU, commonly an AMD APU."""
+    for device in sorted(glob.glob("/sys/class/drm/card[0-9]*/device")):
+        vendor = _classify_gpu(device)
+        if vendor in ("unknown", "nvidia"):
+            continue
+        usage = int_or_none(text(os.path.join(device, "gpu_busy_percent"), ""))
+        used = int_or_none(text(os.path.join(device, "mem_info_vram_used"), ""))
+        total = int_or_none(text(os.path.join(device, "mem_info_vram_total"), ""))
+        frequency = int_or_none(text(os.path.join(device, "gt_cur_freq_mhz"), ""))
+        if frequency is None:
+            for line in text(os.path.join(device, "pp_dpm_sclk"), "").splitlines():
+                if "*" in line:
+                    frequency = int_or_none("".join(ch for ch in line.split(":", 1)[-1] if ch.isdigit()))
+                    break
+        return {
+            "vendor": vendor,
+            "usage": usage if usage is not None and 0 <= usage <= 100 else None,
+            "memory_used": used,
+            "memory_total": total,
+            "frequency": frequency,
+        }
+    return {}
+
+
 def _classify_gpu(device_path):
     """Return 'nvidia', 'amd', 'intel', or 'unknown' for a DRM device."""
     raw = text(os.path.join(device_path, "vendor"), "").strip()
@@ -293,18 +516,24 @@ def gpu_telemetry():
     global _nvidia_gpu_future, _nvidia_gpu_last_started
     result = {
         "usage": None,
-        "temperature": read_thermal("amdgpu") or read_thermal("nvidia"),
+        "temperature": None,
         "frequency": None,
         "memory_used": None,
         "memory_total": None,
+        "power": None,
+        "voltage": None,
         "vendor": None,
     }
 
-    # Collect per-device readings, prefer discrete GPU.
+    # Collect per-device readings, preferring discrete GPU:
+    # 0: NVIDIA (discrete)
+    # 1: AMD (discrete or APU if no NVIDIA)
+    # 2: Intel (integrated)
+    # 3: Unknown
     candidates = []
     for device in sorted(glob.glob("/sys/class/drm/card*/device")):
         vendor = _classify_gpu(device)
-        priority = 0 if vendor in ("nvidia", "amd") else 1  # discrete first
+        priority = 0 if vendor == "nvidia" else (1 if vendor == "amd" else (2 if vendor == "intel" else 3))
         frequency = int_or_none(text(os.path.join(device, "gt_cur_freq_mhz"), ""))
         if frequency is None:
             for line in text(os.path.join(device, "pp_dpm_sclk"), "").splitlines():
@@ -323,9 +552,11 @@ def gpu_telemetry():
         }))
 
     if candidates:
-        candidates.sort(key=lambda c: c[0])
+        # Sort by priority first (NVIDIA > AMD > Intel), then by largest VRAM for multi-GPU
+        candidates.sort(key=lambda c: (c[0], -(c[2]["memory_total"] or 0)))
         best_vendor = candidates[0][1]
         best = candidates[0][2]
+        result["vendor"] = best_vendor
         if best["frequency"] is not None:
             result["frequency"] = best["frequency"]
         if best["usage"] is not None:
@@ -333,7 +564,12 @@ def gpu_telemetry():
         if best["memory_total"] is not None:
             result["memory_used"] = best["memory_used"]
             result["memory_total"] = best["memory_total"]
-        result["vendor"] = best_vendor
+        if best_vendor == "amd":
+            result["temperature"] = read_thermal("amdgpu")
+            result["power"] = gpu_power_watts()
+            result["voltage"] = gpu_voltage_mv()
+        elif best_vendor == "nvidia":
+            result["temperature"] = read_thermal("nvidia")
 
     now = time.monotonic()
     if _nvidia_gpu_future is not None and _nvidia_gpu_future.done():
@@ -346,12 +582,20 @@ def gpu_telemetry():
             fields = [part.strip() for part in nvidia.stdout.splitlines()[0].split(",")]
             try:
                 if len(fields) >= 5:
+                    power_draw = None
+                    if len(fields) >= 6:
+                        try:
+                            power_draw = float(fields[5])
+                        except ValueError:
+                            power_draw = None
                     _nvidia_gpu_cache = {
+                        "vendor": "nvidia",
                         "usage": float(fields[0]),
                         "temperature": float(fields[1]),
                         "frequency": float(fields[2]),
                         "memory_used": float(fields[3]) * 1_048_576,
                         "memory_total": float(fields[4]) * 1_048_576,
+                        "power": power_draw,
                     }
                     _nvidia_gpu_cache_time = now
             except ValueError:
@@ -365,6 +609,8 @@ def gpu_telemetry():
     # useful per-sensor fallback.
     if _nvidia_gpu_cache is not None and now - _nvidia_gpu_cache_time <= _NVIDIA_GPU_CACHE_TTL:
         result.update(_nvidia_gpu_cache)
+        # Clear AMD-specific voltage when NVIDIA telemetry is active
+        result["voltage"] = None
     return result
 
 
@@ -513,12 +759,13 @@ def gpu_names():
                 if not is_graphics or ":" not in line:
                     continue
                 description = line.split(":", 2)[-1].strip()
-                if "[" in description and "]" in description:
-                    description = description[description.index("[") + 1:description.index("]")]
-                description = description.split(" (rev ")[0]
                 if "nvidia" in low:
-                    dgpu = description
+                    match = re.search(r"\[([^\]]+)\]", description)
+                    dgpu = match.group(1) if match and "geforce" in match.group(1).lower() else description
                 elif "amd" in low or "ati" in low:
+                    description = description.replace("Advanced Micro Devices, Inc. [AMD/ATI]", "AMD Radeon Graphics")
+                    description = re.sub(r"\s+\[[0-9a-fA-F]{4}:[0-9a-fA-F]{4}\].*$", "", description)
+                    description = description.split(" (rev ")[0]
                     igpu = description
         _gpu_names = dgpu, igpu
     return _gpu_names

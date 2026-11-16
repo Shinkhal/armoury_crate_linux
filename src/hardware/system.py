@@ -168,6 +168,61 @@ def cpu_freq_ghz():
     return total / count / 1000 if count else 0.0
 
 
+def cpu_max_freq_ghz():
+    """Return the advertised CPU maximum frequency from cpufreq sysfs."""
+    values = []
+    for path in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/cpuinfo_max_freq"):
+        value = int_or_none(text(path, ""))
+        if value is not None and value > 0:
+            values.append(value)
+    return max(values) / 1_000_000 if values else None
+
+
+def hwmon_sensor_value(hwmon_name, filename, label_name=None):
+    """Read a labelled value from an hwmon device, preserving its raw unit."""
+    for path in glob.glob("/sys/class/hwmon/hwmon*"):
+        if text(os.path.join(path, "name"), "").strip() != hwmon_name:
+            continue
+        if label_name is not None:
+            for label_path in glob.glob(os.path.join(path, "*_label")):
+                if text(label_path, "").strip().lower() == label_name.lower():
+                    filename = os.path.basename(label_path).replace("_label", "_input")
+                    break
+        value = int_or_none(text(os.path.join(path, filename), ""))
+        if value is not None:
+            return value
+    return None
+
+
+def gpu_memory_freq_mhz():
+    for path in glob.glob("/sys/class/drm/card*/device/pp_dpm_mclk"):
+        for line in text(path, "").splitlines():
+            if "*" in line:
+                digits = "".join(character for character in line.split(":", 1)[-1] if character.isdigit())
+                value = int_or_none(digits)
+                if value is not None:
+                    return value
+    return None
+
+
+def gpu_voltage_mv():
+    value = hwmon_sensor_value("amdgpu", "in0_input", "vddgfx")
+    return value if value is not None else None
+
+
+def cpu_voltage_mv():
+    for hwmon_name in ("coretemp", "k10temp", "zenpower"):
+        value = hwmon_sensor_value(hwmon_name, "in0_input", "vcore")
+        if value is not None:
+            return value
+    return None
+
+
+def gpu_power_watts():
+    value = hwmon_sensor_value("amdgpu", "power1_input", "PPT")
+    return value / 1_000_000 if value is not None else None
+
+
 def cpu_usage_percent():
     global _cpu_times
     try:

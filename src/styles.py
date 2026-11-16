@@ -1,9 +1,11 @@
 """Application-wide GTK styling."""
+from typography import FONT_FAMILY, FONT_SIZES
+
 CSS = b"""
-* { font-family: Cantarell, sans-serif; }
-window { background: #090a0d; color: #f4f5f8; }
-window .main-content { background: #090a0d; }
-window .sidebar { background: #0d1016; border-right: 1px solid #232833; padding: 14px 9px; }
+* { font-family: __FONT_FAMILY__, sans-serif; }
+window { background: #000000; color: #f4f5f8; }
+window .main-content { background: #000000; }
+window .sidebar { background: #050505; border-right: 1px solid #232833; padding: 14px 9px; }
 window .brand { padding: 8px 4px 16px; }
 window .brand-mark { color: #ff334f; font-size: 26px; font-weight: 900; }
 window .brand-title { color: #f4f5f8; font-size: 12px; font-weight: 800; letter-spacing: 0.4px; }
@@ -106,7 +108,7 @@ window button.color-swatch:hover { background: #252a34; border-color: #5b6371; b
 window button.color-swatch.selected { background: rgba(229, 43, 69, 0.14); border-color: #ff4059; box-shadow: none; }
 window .color-chip { min-width: 22px; min-height: 22px; }
 window .color-picker-button { min-height: 36px; }
-window headerbar { background: #0d1016; border-bottom: 1px solid #232833; box-shadow: none; }
+window headerbar { background: #050505; border-bottom: 1px solid #232833; box-shadow: none; }
 window headerbar button { box-shadow: none; }
 window .header-title { color: #f4f5f8; font-size: 15px; font-weight: 600; letter-spacing: 0; }
 window .monitor-value { font-size: 15px; font-weight: 800; }
@@ -156,52 +158,54 @@ window .system-info-row .info-key { min-width: 150px; }
 window .sidebar-brand { padding: 8px 5px 16px; }
 window .sidebar-brand-name { font-size: 11px; font-weight: 800; letter-spacing: .7px; }
 window .sidebar-brand-subtitle { color: #737b88; font-size: 9px; letter-spacing: 1.6px; }
-window .sidebar { padding: 8px 6px; }
+window .sidebar { padding: 8px 4px; }
 window .sidebar-brand { padding: 4px 2px 10px; }
 window .sidebar-menu-button { min-width: 34px; min-height: 34px; padding: 4px; background: transparent; border: 0; box-shadow: none; }
-window button.nav { min-height: 40px; margin: 1px 0; font-size: 13px; }
+window button.nav { min-height: 40px; margin: 1px 0; padding: 4px 3px; font-size: 13px; }
 window button.nav:checked { background: linear-gradient(90deg, rgba(229,43,69,.24), rgba(229,43,69,.06)); border-color: transparent; border-left: 3px solid #e52b45; }
 window .ac-dashboard { padding: 8px 10px 12px; }
 window .dashboard-toolbar { min-height: 48px; }
 window .dashboard-brand-image { min-width: 105px; min-height: 32px; }
-window .dashboard-system-strip { min-height: 100px; padding: 12px 10px; background: linear-gradient(100deg, #11161d, #0d1117); border: 1px solid #303741; border-radius: 4px; }
-window .dashboard-system-heading { min-height: 34px; color: #f1f3f6; font-size: 15px; font-weight: 750; }
+window .dashboard-system-strip { min-height: 100px; padding: 12px 10px; background: linear-gradient(100deg, #050505, #000000); border: 1px solid #303741; border-radius: 4px; }
+window .dashboard-system-heading { min-height: 30px; color: #f1f3f6; font-size: __FONT_SIZE_DASHBOARD_HEADING__px; font-weight: 700; }
 window .dashboard-system-info-item { padding: 0 13px; }
 window .dashboard-info-icon { color: #a7b2c3; }
-window .dashboard-info-label { color: #929cab; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
-window .dashboard-info-value { color: #f1f3f6; font-size: 13px; font-weight: 650; }
+window .dashboard-info-label { color: #929cab; font-size: __FONT_SIZE_DASHBOARD_CAPTION__px; font-weight: 800; letter-spacing: 1.5px; }
+window .dashboard-info-value { color: #f1f3f6; font-size: __FONT_SIZE_DASHBOARD_INFO__px; font-weight: 650; }
 window .dashboard-system-strip separator { margin: 2px 0; background: #303741; }
-window .dashboard-module { background: repeating-linear-gradient(135deg, #0e1116, #0e1116 3px, #12161c 3px, #12161c 5px); border: 1px solid #394047; border-radius: 3px; padding: 10px; }
-window .dashboard-module-title { min-height: 30px; padding: 4px 8px; color: #dce1e8; font-size: 13px; font-weight: 700; background: repeating-linear-gradient(135deg, #11151b, #11151b 4px, #171c22 4px, #171c22 6px); border: 1px solid #48515a; }
+window .dashboard-module { background: repeating-linear-gradient(135deg, #000000, #000000 3px, #070707 3px, #070707 5px); border: 1px solid #394047; border-radius: 3px; padding: 10px; }
+window .dashboard-module.dashboard-cpu-panel { border: 0; }
+window .dashboard-module-title { min-height: 30px; padding: 4px 8px; color: #dce1e8; font-size: __FONT_SIZE_DASHBOARD_HEADING__px; font-weight: 700; background: repeating-linear-gradient(135deg, #030303, #030303 4px, #0a0a0a 4px, #0a0a0a 6px); border: 1px solid #48515a; }
 window .dashboard-compact-module { padding: 7px 9px; }
-window .dashboard-compact-module .dashboard-module-title { min-height: 23px; padding: 2px 7px; }
-window .dashboard-compact-module .dashboard-stat-row { min-height: 18px; }
 window .dashboard-stat-row { min-height: 24px; }
-window .dashboard-stat-name { color: #d7dce4; font-size: 13px; }
-window .dashboard-stat-value { color: #fff; font-size: 14px; font-weight: 700; }
+window .dashboard-stat-name { color: #d7dce4; font-size: __FONT_SIZE_DASHBOARD_BODY__px; }
+window .dashboard-stat-value { color: #fff; font-size: __FONT_SIZE_DASHBOARD_STAT__px; font-weight: 700; }
+window .dashboard-resource-card { min-width: 0; padding: 2px 3px; }
+window .dashboard-resource-row { min-width: 0; }
+window .dashboard-resource-meter { min-width: 72px; min-height: 72px; }
+window .dashboard-resource-card .dashboard-value-large { font-size: __FONT_SIZE_DASHBOARD_READING__px; }
 window .dashboard-compact-module .dashboard-stat-row { min-height: 23px; }
-window .dashboard-fan-metric { min-height: 56px; padding: 7px 9px; background: rgba(18, 23, 30, .8); border: 1px solid #394047; border-radius: 3px; }
-window .dashboard-fan-meter trough { min-height: 5px; background: #242a32; border-radius: 3px; }
-window .dashboard-fan-meter trough highlight { background: linear-gradient(90deg, #3b8dff, #ff4059); border-radius: 3px; }
-window .dashboard-tiny { color: #8b949e; font-size: 10px; }
+window .dashboard-stat-meter { min-height: 9px; margin: 0 0 3px 0; }
+window .dashboard-tiny { color: #8b949e; font-size: __FONT_SIZE_DASHBOARD_CAPTION__px; }
 window .dashboard-quick-button { background: linear-gradient(#282b30, #101216); color: #f2f4f6; border: 1px solid #5b6065; border-radius: 2px; padding: 6px 10px; box-shadow: none; }
 window .dashboard-mode-button { background: transparent; color: #ddd; border: 0; border-bottom: 2px solid #40464e; border-radius: 0; padding: 8px 4px; box-shadow: none; }
 window .dashboard-mode-button.active { color: #ff5268; border-bottom-color: #ff334f; background: rgba(229,43,69,.1); }
 window .dashboard-cpu-gauge { min-height: 260px; }
-window .dashboard-gauge-value { font-size: 30px; font-weight: 700; color: #f5f6f8; }
-window .dashboard-gauge-label { color: #b7bdc7; font-size: 11px; }
-window .dashboard-meter trough { min-height: 6px; background: #20252c; border-radius: 0; }
-window .dashboard-meter trough highlight { background: linear-gradient(90deg, #08aaff, #e52b45); border-radius: 0; }
+window .dashboard-gauge-value { font-size: __FONT_SIZE_DASHBOARD_TEMPERATURE__px; font-weight: 700; color: #f5f6f8; }
+window .dashboard-gauge-label { color: #b7bdc7; font-size: __FONT_SIZE_DASHBOARD_SECONDARY__px; }
 window .dashboard-profile-entry { min-height: 68px; margin: 4px; padding: 12px 14px; }
 window .dashboard-profile-entry .profile-symbol { min-width: 28px; margin-right: 4px; padding: 0; background: transparent; border: 0; border-radius: 0; color: #ff5268; font-size: 20px; }
 window .dashboard-profile-entry.active { background: rgba(229,43,69,.12); border-bottom: 2px solid #e52b45; }
+window .dashboard-profile-row { margin-top: 8px; }
+window button.dashboard-profile-name { min-height: 34px; padding: 5px 8px; color: #dce1e8; background: transparent; border: 0; border-bottom: 2px solid #3a4049; border-radius: 0; box-shadow: none; font-size: __FONT_SIZE_DASHBOARD_BODY__px; }
+window button.dashboard-profile-name:hover { color: #fff; background: rgba(255,255,255,.05); }
+window button.dashboard-profile-name.active { color: #ff5268; background: rgba(229,43,69,.10); border-bottom-color: #ff334f; }
 window button.dashboard-action-button { min-height: 42px; padding: 7px 10px; background: #151a22; border: 1px solid #303742; border-radius: 4px; color: #e9edf3; box-shadow: none; }
 window button.dashboard-action-button:hover { background: #202630; border-color: #596474; box-shadow: none; }
-window .dashboard-action-label { color: #e9edf3; font-size: 12px; font-weight: 650; }
-window .dashboard-battery-meter trough { min-height: 8px; background: #252a32; border-radius: 4px; }
-window levelbar.dashboard-battery-meter block.filled { background: linear-gradient(90deg, #34c98b, #80dd78); border: 0; border-radius: 4px; }
-window .dashboard-unsupported { color: #7d858f; font-size: 11px; }
-window .dashboard-value-large { font-size: 20px; font-weight: 700; color: #f7f8fa; }
+window .dashboard-action-label { color: #e9edf3; font-size: __FONT_SIZE_DASHBOARD_BODY__px; font-weight: 650; }
+window .dashboard-battery-icon { min-height: 38px; }
+window .dashboard-unsupported { color: #7d858f; font-size: __FONT_SIZE_DASHBOARD_SECONDARY__px; }
+window .dashboard-value-large { font-size: __FONT_SIZE_DASHBOARD_READING__px; font-weight: 700; color: #f7f8fa; }
 window button.mode-option { background: transparent; border: 0; border-bottom: 1px solid #34363b; border-radius: 0; padding: 12px 10px 16px; box-shadow: none; }
 window button.mode-option:hover { background: #141417; box-shadow: none; }
 window button.mode-option.active { background: linear-gradient(180deg, transparent, rgba(220, 26, 47, .13)); border-bottom: 3px solid #e52b45; }
@@ -257,3 +261,8 @@ window button.battery-secondary-button { min-height: 42px; background: transpare
 window button.battery-secondary-button:hover { background: #152124; color: #e5eeee; border-color: #527476; box-shadow: none; }
 window .battery-feedback { color: #83c3bf; font-size: 10px; }
 """
+
+CSS = CSS.replace(b"__FONT_FAMILY__", FONT_FAMILY.encode("ascii"))
+for _role, _size in FONT_SIZES.items():
+    _placeholder = f"__FONT_SIZE_{_role.upper()}__".encode("ascii")
+    CSS = CSS.replace(_placeholder, str(_size).encode("ascii"))

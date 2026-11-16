@@ -1,5 +1,4 @@
 """Main application shell, navigation, and cross-page state."""
-import os
 
 import gi
 
@@ -8,7 +7,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from config import (
-    ASSET_DIR, CHARGE_LIMITS, GPU_MODES, PPD_IFACE, PPD_NAME, PPD_PATH,
+    CHARGE_LIMITS, GPU_MODES, PPD_IFACE, PPD_NAME, PPD_PATH,
     PROFILE_IDS, TELEMETRY_REFRESH_SECONDS,
 )
 from components.widgets import asus_image, label, page_heading
@@ -18,8 +17,9 @@ from hardware.asus import (
     rpm, set_prop, system_bus,
 )
 from hardware.system import (
-    cpu_freq_ghz, cpu_model, cpu_usage_percent, disk_usage, gpu_names,
-    gpu_usage_percent, os_pretty_name, pretty_product_name, read_disks,
+    cpu_freq_ghz, cpu_max_freq_ghz, cpu_model, cpu_usage_percent, cpu_voltage_mv,
+    disk_usage, gpu_memory_freq_mhz, gpu_names, gpu_power_watts, gpu_telemetry,
+    gpu_usage_percent, gpu_voltage_mv, os_pretty_name, pretty_product_name,
     read_battery_state, read_memory, read_thermal, text,
     shutdown_telemetry,
 )
@@ -30,6 +30,9 @@ from pages.cooling import CoolingPage
 from pages.battery import BatteryPage
 from pages.lighting import LightingPage
 from pages.gpu import GpuPage
+
+SIDEBAR_EXPANDED_WIDTH = 130
+SIDEBAR_COLLAPSED_WIDTH = 68
 
 
 class ArmouryWindow(
@@ -50,12 +53,11 @@ class ArmouryWindow(
         root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.toast_overlay.set_child(root)
         self.sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        self.sidebar.set_size_request(250, -1)
+        self.sidebar.set_size_request(SIDEBAR_EXPANDED_WIDTH, -1)
         self.sidebar.add_css_class("sidebar")
         root.append(self.sidebar)
         self.sidebar_collapsed = False
         self.sidebar_labels = []
-        self.sidebar_compact_hidden = []
         self.sidebar_nav_boxes = []
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=160)
         self.stack.set_hexpand(True)
@@ -98,11 +100,13 @@ class ArmouryWindow(
 
     def add_page(self, name, title, icon_file, fallback_icon, builder):
         button = Gtk.ToggleButton()
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10, halign=Gtk.Align.FILL)
-        icon = asus_image(icon_file, fallback_icon, 16)
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6, halign=Gtk.Align.FILL)
+        icon = asus_image(icon_file, fallback_icon, 14)
         if icon is not None:
             box.append(icon)
         nav_label = Gtk.Label(label=title, xalign=0)
+        nav_label.set_wrap(False)
+        nav_label.set_ellipsize(3)
         box.append(nav_label)
         button.set_child(box)
         button.set_tooltip_text(title)
@@ -128,21 +132,13 @@ class ArmouryWindow(
         menu.connect("toggled", self.on_sidebar_toggle)
         self.sidebar_menu_button = menu
         brand.append(menu)
-        brand_logo_path = os.path.join(ASSET_DIR, "asus_gc_landing_rog_logo.png")
-        if os.path.isfile(brand_logo_path):
-            brand_logo = Gtk.Picture.new_for_filename(brand_logo_path)
-            brand_logo.set_content_fit(Gtk.ContentFit.CONTAIN)
-            brand_logo.set_size_request(72, 30)
-            brand.append(brand_logo)
-        brand_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        brand_text.append(label("ARMOURY CRATE", "sidebar-brand-name"))
-        brand_text.append(label("REPUBLIC OF GAMERS", "sidebar-brand-subtitle"))
-        brand.append(brand_text)
-        self.sidebar_compact_hidden.extend([brand_logo if os.path.isfile(brand_logo_path) else None, brand_text])
         self.sidebar.append(brand)
         self.sidebar.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
         section_label = label("DEVICE", "nav-section")
         device_label = label(pretty_product_name(text("/sys/class/dmi/id/product_name", "ASUS laptop")), "subtle")
+        device_label.set_wrap(False)
+        device_label.set_ellipsize(3)
+        device_label.set_hexpand(True)
         self.sidebar.append(section_label)
         self.sidebar.append(device_label)
         self.sidebar_labels.extend([section_label, device_label])
@@ -156,6 +152,8 @@ class ArmouryWindow(
         self.nav_buttons["home"].set_active(True)
         self.sidebar.append(Gtk.Box(vexpand=True))
         footer = label("Live status · 4 sec refresh", "footer")
+        footer.set_wrap(False)
+        footer.set_ellipsize(3)
         self.sidebar.append(footer)
         self.sidebar_labels.append(footer)
         self.sidebar.set_margin_bottom(20)
@@ -173,10 +171,11 @@ class ArmouryWindow(
 
     def on_sidebar_toggle(self, button):
         self.sidebar_collapsed = button.get_active()
-        self.sidebar.set_size_request(68 if self.sidebar_collapsed else 250, -1)
+        width = SIDEBAR_COLLAPSED_WIDTH if self.sidebar_collapsed else SIDEBAR_EXPANDED_WIDTH
+        self.sidebar.set_size_request(width, -1)
         self.sidebar.set_spacing(12 if self.sidebar_collapsed else 6)
         button.set_tooltip_text("Expand navigation" if self.sidebar_collapsed else "Collapse navigation")
-        for widget in self.sidebar_labels + [w for w in self.sidebar_compact_hidden if w is not None]:
+        for widget in self.sidebar_labels:
             widget.set_visible(not self.sidebar_collapsed)
         for nav_box in self.sidebar_nav_boxes:
             nav_box.set_halign(Gtk.Align.CENTER if self.sidebar_collapsed else Gtk.Align.FILL)
@@ -244,46 +243,92 @@ class ArmouryWindow(
             self.limit_feedback.set_text("No battery charge threshold was found. Check that asusctl and the ASUS kernel module are available.")
         hwmon = fan_hwmon()
         cpu = fan_read(hwmon, "fan1_input")
-        gpu = fan_read(hwmon, "fan2_input")
+        gpu_fan = fan_read(hwmon, "fan2_input")
         self.cpu_fan_value.set_text(rpm(cpu))
-        self.gpu_fan_value.set_text(rpm(gpu))
+        self.gpu_fan_value.set_text(rpm(gpu_fan))
         if hasattr(self, "dashboard_values"):
             cpu_temp = read_thermal("acpitz")
-            gpu_temp = read_thermal("amdgpu")
+            gpu = gpu_telemetry()
+            gpu_temp = gpu["temperature"] or read_thermal("amdgpu") or read_thermal("nvidia")
             freq = cpu_freq_ghz()
             total_gb, free_gb, used_pct = disk_usage()
             cpu_usage = cpu_usage_percent()
-            gpu_usage = gpu_usage_percent()
+            gpu_usage = gpu["usage"]
             self.cpu_temperature = cpu_temp
             self.cpu_gauge.queue_draw()
             self.dashboard_gauge_value.set_text(f"{cpu_temp:.0f} °C" if cpu_temp is not None else "— °C")
-            self.dashboard_values["cpu_frequency"].set_text(f"{freq * 1000:.0f} MHz" if freq else "Unavailable")
+            max_freq = cpu_max_freq_ghz()
+            freq_text = f"{freq * 1000:.0f} / {max_freq * 1000:.0f} MHz" if freq and max_freq else (f"{freq * 1000:.0f} MHz" if freq else "Unavailable")
+            self.dashboard_values["cpu_frequency"].set_text(freq_text)
+            self.dashboard_stat_meter_values["cpu_frequency"] = freq * 1000 if freq else None
+            self.dashboard_stat_meters["cpu_frequency"].queue_draw()
             self.dashboard_values["cpu_usage"].set_text(f"{cpu_usage:.0f}%" if cpu_usage is not None else "Sampling…")
+            self.dashboard_stat_meter_values["cpu_usage"] = cpu_usage
+            self.dashboard_stat_meters["cpu_usage"].queue_draw()
             self.dashboard_values["cpu_temperature"].set_text(f"{cpu_temp:.0f} °C" if cpu_temp is not None else "Unavailable")
+            cpu_voltage = cpu_voltage_mv()
+            self.dashboard_values["cpu_voltage"].set_text(
+                f"{cpu_voltage} mV" if cpu_voltage is not None else "Unavailable"
+            )
             self.dashboard_cpu_usage.set_text(f"{cpu_usage:.0f}%" if cpu_usage is not None else "Sampling…")
-            self.dashboard_cpu_usage_bar.set_value(cpu_usage or 0)
+            self.dashboard_stat_meter_values["cpu_usage_card"] = cpu_usage
+            self.dashboard_cpu_usage_bar.queue_draw()
             self.dashboard_values["gpu_temperature"].set_text(f"{gpu_temp:.0f} °C" if gpu_temp is not None else "Unavailable")
             self.dashboard_values["gpu_usage"].set_text(f"{gpu_usage:.0f}%" if gpu_usage is not None else "Unavailable")
+            self.dashboard_stat_meter_values["gpu_usage"] = gpu_usage
+            self.dashboard_stat_meters["gpu_usage"].queue_draw()
+            gpu_frequency = gpu["frequency"]
+            self.dashboard_values["gpu_frequency"].set_text(
+                f"{gpu_frequency:.0f} MHz" if gpu_frequency is not None else "Unavailable"
+            )
+            self.dashboard_stat_meter_values["gpu_frequency"] = gpu_frequency
+            self.dashboard_stat_meters["gpu_frequency"].queue_draw()
+            memory_frequency = gpu_memory_freq_mhz()
+            self.dashboard_values["gpu_memory_frequency"].set_text(
+                f"{memory_frequency} MHz" if memory_frequency is not None else "Unavailable"
+            )
+            gpu_voltage = gpu_voltage_mv()
+            self.dashboard_values["gpu_voltage"].set_text(
+                f"{gpu_voltage} mV" if gpu_voltage is not None else "Unavailable"
+            )
+            gpu_power = gpu_power_watts()
+            self.dashboard_values["gpu_tgp"].set_text(
+                f"{gpu_power:.1f} W" if gpu_power is not None else "Unavailable"
+            )
             self.dashboard_gpu_usage.set_text(f"{gpu_usage:.0f}%" if gpu_usage is not None else "Unavailable")
-            self.dashboard_gpu_usage_bar.set_value(gpu_usage or 0)
-            for key, speed in (("cpu_fan", cpu), ("gpu_fan", gpu)):
+            self.dashboard_stat_meter_values["gpu_usage_card"] = gpu_usage
+            self.dashboard_gpu_usage_bar.queue_draw()
+            for key, speed in (("cpu_fan", cpu), ("gpu_fan", gpu_fan)):
                 self.dashboard_values[key].set_text(rpm(speed))
-                self.dashboard_fan_bars[key].set_value(max(0, min(6000, speed or 0)))
-            self.dashboard_resource_values["storage"].set_text(f"{free_gb:.0f} GB free · {used_pct:.0f}% used")
-            self.dashboard_bars["storage"].set_value(used_pct)
+                self.dashboard_fan_details[key].set_text(
+                    f"{max(0, min(6000, speed)) / 60:.0f}% max" if speed is not None else "Fan speed unavailable"
+                )
+                self.dashboard_resource_usage[key] = (
+                    max(0, min(6000, speed)) / 6000 if speed is not None else 0.0
+                )
+                self.dashboard_fan_gauges[key].queue_draw()
             memory_total, memory_available = read_memory()
             if memory_total is not None and memory_available is not None:
                 memory_used = memory_total - memory_available
                 memory_percent = memory_used / memory_total * 100 if memory_total else 0
-                self.dashboard_resource_values["ram"].set_text(f"{memory_used / 1048576:.1f} / {memory_total / 1048576:.1f} GB")
-                self.dashboard_bars["ram"].set_value(memory_percent)
-            disk_models = read_disks()
-            self.dashboard_resource_values["ssd"].set_text(" · ".join(disk_models) if disk_models else "Unavailable")
-            self.dashboard_bars["ssd"].set_value(used_pct)
+                self.dashboard_resource_values["ram"].set_text(f"{memory_percent:.1f}%")
+                self.dashboard_resource_details["ram"].set_text(
+                    f"{memory_used / 1048576:.1f}/{memory_total / 1048576:.1f} GB"
+                )
+                self.dashboard_resource_usage["ram"] = memory_percent / 100
+                self.dashboard_resource_meters["ram"].queue_draw()
+            storage_used_gb = total_gb - free_gb
+            self.dashboard_resource_values["storage"].set_text(f"{used_pct:.0f}%")
+            self.dashboard_resource_details["storage"].set_text(
+                f"{storage_used_gb:.1f}/{total_gb:.1f} GB"
+            )
+            self.dashboard_resource_usage["storage"] = used_pct / 100
+            self.dashboard_resource_meters["storage"].queue_draw()
             battery_level, battery_status, battery_eta = read_battery_state()
             battery_label = f"{battery_level}% · {battery_status}" if battery_level is not None else "Unavailable"
             self.dashboard_battery_value.set_text(battery_label)
-            self.dashboard_battery_bar.set_value(battery_level or 0)
+            self.dashboard_battery_level = battery_level
+            self.dashboard_battery_icon.queue_draw()
             if battery_status == "Full":
                 estimate_label = "Fully charged"
             elif battery_eta is None:

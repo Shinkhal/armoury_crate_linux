@@ -22,7 +22,7 @@ jobs:
         run: python -m py_compile src/hardware/system.py src/hardware/asus.py src/hardware/capabilities.py src/config.py
 
       - name: Run tests
-        run: python -m pytest tests/ -v
+        run: python -m unittest discover -s tests -v
 
       - name: Verify packaging scripts parse
         run: bash -n packaging/build-packages.sh

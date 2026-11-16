@@ -22,6 +22,8 @@ jobs:
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             echo "${GITHUB_REF_NAME#v}" > VERSION
           fi
+      - name: Run tests
+        run: python3 -m unittest discover -s tests -v
       - name: Build RPM and DEB packages
         run: ./packaging/build-packages.sh
       - name: Validate package metadata

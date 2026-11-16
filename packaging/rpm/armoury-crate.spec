@@ -35,6 +35,10 @@ install -Dpm 0644 %{_sourcedir}/armoury-crate.svg %{buildroot}%{_datadir}/icons/
 %{_datadir}/icons/hicolor/scalable/apps/armoury-crate.svg
 
 %changelog
+* Mon Nov 16 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.8-1
+- Fix mixed-unit battery aggregation, GPU device identification, sensor
+  label validation, and restore dashboard scrolling
+
 * Mon Nov 16 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.2.7-1
 - Refine dashboard layout, telemetry cards, and sidebar sizing
 

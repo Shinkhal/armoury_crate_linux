@@ -20,6 +20,7 @@ class DashboardPage:
     def build_home(self):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         outer.add_css_class("main-content")
+        scroll = Gtk.ScrolledWindow(vexpand=True, hscrollbar_policy=Gtk.PolicyType.NEVER)
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         content.add_css_class("ac-dashboard")
         content.set_vexpand(True)
@@ -128,7 +129,6 @@ class DashboardPage:
         cpu_stats.set_spacing(4)
         self.dashboard_stat_meter(cpu_stats, "Frequency", "—", "cpu_frequency", 6000, "#35a8ff")
         self.dashboard_stat_meter(cpu_stats, "Usage", "—", "cpu_usage", 100, "#35a8ff")
-        self.dashboard_stat(cpu_stats, "Memory Frequency", "Unavailable", "cpu_memory_frequency")
         self.dashboard_stat(cpu_stats, "Temperature", "—", "cpu_temperature")
         self.dashboard_stat(cpu_stats, "Voltage", "Unavailable", "cpu_voltage")
 
@@ -140,7 +140,7 @@ class DashboardPage:
         self.dashboard_stat(gpu_stats, "Memory Frequency", "Unavailable", "gpu_memory_frequency")
         self.dashboard_stat(gpu_stats, "Temperature", "Unavailable", "gpu_temperature")
         self.dashboard_stat(gpu_stats, "Voltage", "Unavailable", "gpu_voltage")
-        self.dashboard_stat(gpu_stats, "TGP", "Unavailable", "gpu_tgp")
+        self.dashboard_stat(gpu_stats, "Power", "Unavailable", "gpu_tgp")
 
         self.add_dashboard_tile(cards, "cpu_stats", cpu_stats)
         self.add_dashboard_tile(cards, "gpu_stats", gpu_stats)
@@ -284,7 +284,8 @@ class DashboardPage:
 
         main_grid.attach(cards, 3, 0, 7, 1)
         content.append(main_grid)
-        outer.append(content)
+        scroll.set_child(content)
+        outer.append(scroll)
         return outer
 
     def load_dashboard_tile_order(self):

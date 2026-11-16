@@ -91,9 +91,25 @@ def read_battery_state():
     if not batteries:
         return None, "Unknown", None
 
-    total_full = sum(item["full"] for item in batteries)
-    total_remaining = sum(item["remaining"] for item in batteries)
-    capacity = round(total_remaining * 100 / total_full) if total_full else None
+    units = {item["unit"] for item in batteries}
+    if len(units) == 1:
+        # All batteries use the same unit — safe to add raw values.
+        total_full = sum(item["full"] for item in batteries)
+        total_remaining = sum(item["remaining"] for item in batteries)
+        capacity = round(total_remaining * 100 / total_full) if total_full else None
+    else:
+        # Mixed units — compute a weighted average from each battery's own
+        # capacity percentage, weighted by its full capacity in its own unit.
+        # This avoids adding incompatible physical quantities.
+        weighted_sum = sum(
+            (item["remaining"] / item["full"] * 100) * item["full"]
+            for item in batteries if item["full"] > 0
+        )
+        weight_total = sum(item["full"] for item in batteries if item["full"] > 0)
+        capacity = round(weighted_sum / weight_total) if weight_total else None
+        # Raw sums are invalid across mixed units.
+        total_remaining = total_full = None
+
     statuses = {item["status"].lower() for item in batteries}
     if "discharging" in statuses:
         status = "Discharging"
@@ -106,7 +122,7 @@ def read_battery_state():
 
     # Only calculate a combined ETA when every battery uses the same unit.
     eta = None
-    if len({item["unit"] for item in batteries}) == 1:
+    if len(units) == 1 and total_remaining is not None:
         eta = estimate_battery_minutes(
             status,
             total_remaining,
@@ -184,10 +200,16 @@ def hwmon_sensor_value(hwmon_name, filename, label_name=None):
         if text(os.path.join(path, "name"), "").strip() != hwmon_name:
             continue
         if label_name is not None:
+            matched = False
             for label_path in glob.glob(os.path.join(path, "*_label")):
                 if text(label_path, "").strip().lower() == label_name.lower():
                     filename = os.path.basename(label_path).replace("_label", "_input")
+                    matched = True
                     break
+            if not matched:
+                # Label was requested but not found — do NOT fall back to
+                # an unrelated sensor.  Skip this hwmon device.
+                continue
         value = int_or_none(text(os.path.join(path, filename), ""))
         if value is not None:
             return value
@@ -249,18 +271,40 @@ def gpu_usage_percent():
     return None
 
 
+def _classify_gpu(device_path):
+    """Return 'nvidia', 'amd', 'intel', or 'unknown' for a DRM device."""
+    raw = text(os.path.join(device_path, "vendor"), "").strip()
+    try:
+        vendor = int(raw, 16) if raw.startswith("0x") else int(raw)
+    except (ValueError, TypeError):
+        return "unknown"
+    if vendor == 0x10de:
+        return "nvidia"
+    if vendor == 0x1002:
+        return "amd"
+    if vendor == 0x8086:
+        return "intel"
+    return "unknown"
+
+
 def gpu_telemetry():
-    """Read available GPU sensors from NVIDIA tooling or Linux DRM sysfs."""
+    """Read available GPU sensors, preferring discrete over integrated."""
     global _nvidia_gpu_cache, _nvidia_gpu_cache_time
     global _nvidia_gpu_future, _nvidia_gpu_last_started
     result = {
-        "usage": gpu_usage_percent(),
+        "usage": None,
         "temperature": read_thermal("amdgpu") or read_thermal("nvidia"),
         "frequency": None,
         "memory_used": None,
         "memory_total": None,
+        "vendor": None,
     }
-    for device in glob.glob("/sys/class/drm/card*/device"):
+
+    # Collect per-device readings, prefer discrete GPU.
+    candidates = []
+    for device in sorted(glob.glob("/sys/class/drm/card*/device")):
+        vendor = _classify_gpu(device)
+        priority = 0 if vendor in ("nvidia", "amd") else 1  # discrete first
         frequency = int_or_none(text(os.path.join(device, "gt_cur_freq_mhz"), ""))
         if frequency is None:
             for line in text(os.path.join(device, "pp_dpm_sclk"), "").splitlines():
@@ -268,12 +312,28 @@ def gpu_telemetry():
                     digits = "".join(character for character in line.split(":", 1)[-1] if character.isdigit())
                     frequency = int_or_none(digits)
                     break
-        if frequency is not None and result["frequency"] is None:
-            result["frequency"] = frequency
+        usage = int_or_none(text(os.path.join(device, "gpu_busy_percent"), ""))
         used = int_or_none(text(os.path.join(device, "mem_info_vram_used"), ""))
         total = int_or_none(text(os.path.join(device, "mem_info_vram_total"), ""))
-        if used is not None and total and result["memory_total"] is None:
-            result["memory_used"], result["memory_total"] = used, total
+        candidates.append((priority, vendor, {
+            "frequency": frequency,
+            "usage": usage if usage is not None and 0 <= usage <= 100 else None,
+            "memory_used": used,
+            "memory_total": total if total and used is not None else None,
+        }))
+
+    if candidates:
+        candidates.sort(key=lambda c: c[0])
+        best_vendor = candidates[0][1]
+        best = candidates[0][2]
+        if best["frequency"] is not None:
+            result["frequency"] = best["frequency"]
+        if best["usage"] is not None:
+            result["usage"] = best["usage"]
+        if best["memory_total"] is not None:
+            result["memory_used"] = best["memory_used"]
+            result["memory_total"] = best["memory_total"]
+        result["vendor"] = best_vendor
 
     now = time.monotonic()
     if _nvidia_gpu_future is not None and _nvidia_gpu_future.done():

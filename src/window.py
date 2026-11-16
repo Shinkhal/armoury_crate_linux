@@ -292,8 +292,10 @@ class ArmouryWindow(
                 f"{gpu_voltage} mV" if gpu_voltage is not None else "Unavailable"
             )
             gpu_power = gpu_power_watts()
+            vendor = gpu.get("vendor", "")
+            power_label = "AMD PPT" if vendor == "amd" else "TGP"
             self.dashboard_values["gpu_tgp"].set_text(
-                f"{gpu_power:.1f} W" if gpu_power is not None else "Unavailable"
+                f"{gpu_power:.1f} W ({power_label})" if gpu_power is not None else "Unavailable"
             )
             self.dashboard_gpu_usage.set_text(f"{gpu_usage:.0f}%" if gpu_usage is not None else "Unavailable")
             self.dashboard_stat_meter_values["gpu_usage_card"] = gpu_usage

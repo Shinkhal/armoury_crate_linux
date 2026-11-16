@@ -1,6 +1,8 @@
 """Device resource monitor and running applications pages."""
+import math
 import time
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -52,8 +54,8 @@ class DevicePage:
         self.device_previous_disk_active = None
         self.device_process_refresh_counter = 0
         self.device_cpu_times = None
-        self.device_recording = True
-        self.device_recording_started = time.monotonic()
+        self.device_recording = False
+        self.device_recording_started = None
         self.device_metric_values = {}
         self.device_metric_rows = {}
         self.device_visible_metrics = set()
@@ -86,31 +88,87 @@ class DevicePage:
         return outer
 
     def _build_resource_monitor(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        page.set_margin_top(8)
+        page.set_margin_bottom(12)
+
+        # ── Header bar with title and controls ──
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        header.add_css_class("resource-monitor-header")
+
+        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        title_box.set_valign(Gtk.Align.CENTER)
+        title_box.append(label("Resource Monitor", "monitor-panel-title"))
+        title_box.append(label("Live hardware telemetry and performance overview", "device-resource-detail"))
+        header.append(title_box)
+        header.append(Gtk.Box(hexpand=True))
+        page.append(header)
+
+        # ── Toolbar: recording status, level, time view, record button ──
+        toolbar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         toolbar.add_css_class("resource-toolbar")
-        self.device_recording_label = label("●  RECORDING  00:00", "resource-recording")
-        toolbar.append(self.device_recording_label)
+
+        status_pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        status_pill.add_css_class("resource-status-pill")
+        status_pill.add_css_class("resource-toolbar-item")
+        status_pill.set_valign(Gtk.Align.CENTER)
+        self.device_recording_label = label("⏸  STOPPED", "resource-paused")
+        status_pill.append(self.device_recording_label)
+        toolbar.append(status_pill)
+
         toolbar.append(Gtk.Box(hexpand=True))
-        toolbar.append(label("LEVEL", "resource-toolbar-label"))
+
+        # Level selector
+        level_group = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        level_group.add_css_class("resource-toolbar-item")
+        level_group.set_valign(Gtk.Align.CENTER)
+        level_label = label("LEVEL", "resource-toolbar-label")
+        level_label.set_valign(Gtk.Align.CENTER)
+        level_group.append(level_label)
         self.device_level_dropdown = Gtk.DropDown.new_from_strings([item[0] for item in self.LEVELS])
-        self.device_level_dropdown.set_selected(2)
+        self.device_level_dropdown.set_selected(0)
+        self.device_level_dropdown.add_css_class("resource-toolbar-dropdown")
         self.device_level_dropdown.connect("notify::selected", self.on_device_level_changed)
-        toolbar.append(self.device_level_dropdown)
-        toolbar.append(label("VIEW", "resource-toolbar-label"))
+        level_group.append(self.device_level_dropdown)
+        toolbar.append(level_group)
+
+        # Separator
+        sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        sep.add_css_class("resource-toolbar-sep")
+        toolbar.append(sep)
+
+        # Time view selector
+        view_group = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        view_group.add_css_class("resource-toolbar-item")
+        view_group.set_valign(Gtk.Align.CENTER)
+        view_label = label("VIEW", "resource-toolbar-label")
+        view_label.set_valign(Gtk.Align.CENTER)
+        view_group.append(view_label)
         self.device_time_view = Gtk.DropDown.new_from_strings(["1 minute", "5 minutes", "10 minutes"])
         self.device_time_view.set_selected(1)
+        self.device_time_view.add_css_class("resource-toolbar-dropdown")
         self.device_time_view.connect("notify::selected", self.on_device_time_view_changed)
-        toolbar.append(self.device_time_view)
-        self.device_record_button = Gtk.Button(label="Stop")
+        view_group.append(self.device_time_view)
+        toolbar.append(view_group)
+
+        # Separator
+        sep2 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        sep2.add_css_class("resource-toolbar-sep")
+        toolbar.append(sep2)
+
+        # Record/Stop button
+        self.device_record_button = Gtk.Button(label="Record")
         self.device_record_button.add_css_class("resource-record-button")
         self.device_record_button.connect("clicked", self.on_device_record_clicked)
         toolbar.append(self.device_record_button)
         page.append(toolbar)
 
+        # ── Main monitor frame: chart + side metrics ──
         main = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         main.add_css_class("resource-monitor-frame")
-        chart_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+
+        # Chart area with hover tooltip
+        chart_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         chart_box.add_css_class("resource-chart-wrap")
         chart_box.set_hexpand(True)
         self.device_chart = Gtk.DrawingArea()
@@ -120,36 +178,78 @@ class DevicePage:
         self.device_chart.set_vexpand(True)
         self.device_chart.add_css_class("resource-chart")
         self.device_chart.set_draw_func(self.draw_resource_chart)
+
+        # Hover motion controller for tooltip
+        self.device_chart_hover_x = -1
+        self.device_chart_hover_y = -1
+        motion = Gtk.EventControllerMotion()
+        motion.connect("motion", self._on_chart_motion)
+        motion.connect("leave", self._on_chart_leave)
+        self.device_chart.add_controller(motion)
+
         chart_box.append(self.device_chart)
         main.append(chart_box)
 
-        metrics_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        # Metrics sidebar
+        metrics_scroll = Gtk.ScrolledWindow()
+        metrics_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        metrics_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         metrics_box.add_css_class("resource-metrics-panel")
-        metrics_box.set_size_request(184, -1)
-        metrics_box.append(label("RESOURCE METRICS", "resource-metrics-heading"))
+        metrics_box.set_size_request(210, -1)
+
+        metrics_heading = label("RESOURCE METRICS", "resource-metrics-heading")
+        metrics_heading.set_margin_bottom(8)
+        metrics_box.append(metrics_heading)
+
         self.device_metric_values = {}
         for key, (title, colour, _scale, _kind) in self.METRICS.items():
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
             row.add_css_class("resource-metric-row")
+            row.set_valign(Gtk.Align.CENTER)
+
             dot = label("", "resource-metric-dot")
             dot.set_markup(f'<span foreground="{colour}">●</span>')
+            dot.set_valign(Gtk.Align.CENTER)
             row.append(dot)
-            row.append(label(title, "resource-metric-name"))
-            row.append(Gtk.Box(hexpand=True))
+
+            name_label = label(title, "resource-metric-name")
+            name_label.set_hexpand(True)
+            name_label.set_ellipsize(3)
+            name_label.set_valign(Gtk.Align.CENTER)
+            row.append(name_label)
+
             value = label("—", "resource-metric-value")
             value.set_halign(Gtk.Align.END)
+            value.set_valign(Gtk.Align.CENTER)
             row.append(value)
+
             metrics_box.append(row)
             self.device_metric_values[key] = value
             self.device_metric_rows[key] = row
-        main.append(metrics_box)
+
+        metrics_scroll.set_child(metrics_box)
+        main.append(metrics_scroll)
         page.append(main)
 
         return page
 
+    def _on_chart_motion(self, _controller, x, y):
+        self.device_chart_hover_x = x
+        self.device_chart_hover_y = y
+        if self.device_chart is not None:
+            self.device_chart.queue_draw()
+
+    def _on_chart_leave(self, _controller):
+        self.device_chart_hover_x = -1
+        self.device_chart_hover_y = -1
+        if self.device_chart is not None:
+            self.device_chart.queue_draw()
+
     def _build_applications_page(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         page.add_css_class("applications-panel")
+        page.set_margin_top(8)
+
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         header.add_css_class("applications-heading")
         header.append(label("RUNNING APPLICATIONS", "resource-metrics-heading"))
@@ -233,9 +333,13 @@ class DevicePage:
             self.device_recording_started = time.monotonic()
             self.device_record_button.set_label("Stop")
             self.device_recording_label.set_text("●  RECORDING  00:00")
+            self.device_recording_label.remove_css_class("resource-paused")
+            self.device_recording_label.add_css_class("resource-recording")
         else:
             self.device_record_button.set_label("Record")
-            self.device_recording_label.set_text("Ⅱ  PAUSED")
+            self.device_recording_label.set_text("⏸  STOPPED")
+            self.device_recording_label.remove_css_class("resource-recording")
+            self.device_recording_label.add_css_class("resource-paused")
 
     def refresh_device_monitor(self, cpu_sample=None, cpu_sampled=False):
         if not hasattr(self, "device_history"):
@@ -354,24 +458,129 @@ class DevicePage:
         return minutes * 60
 
     def draw_resource_chart(self, _area, context, width, height):
-        left, right, top, bottom = 42, max(46, width - 10), 12, max(20, height - 29)
+        # Margins: extra left for Y-axis label, extra bottom for X-axis label
+        left, right, top, bottom = 56, max(60, width - 16), 22, max(30, height - 46)
         plot_height = bottom - top
         plot_width = right - left
-        context.set_source_rgb(0.025, 0.035, 0.050)
+        visible_count = self._visible_sample_count()
+        minutes = visible_count // 60
+
+        # ── Background ──
+        context.set_source_rgb(0.020, 0.030, 0.045)
         context.paint()
+
+        # Subtle radial glow in the center of the plot
+        gradient = cairo.RadialGradient(
+            left + plot_width * 0.5, top + plot_height * 0.4, plot_width * 0.05,
+            left + plot_width * 0.5, top + plot_height * 0.4, plot_width * 0.7,
+        )
+        gradient.add_color_stop_rgba(0, 0.04, 0.07, 0.12, 0.30)
+        gradient.add_color_stop_rgba(1, 0.02, 0.03, 0.045, 0.0)
+        context.set_source(gradient)
+        context.paint()
+
+        context.select_font_face("Cantarell", 0, 0)
+
+        # ── Y-axis gridlines: 0, 10, 20, … 100 ──
         context.set_font_size(9)
-        for value in (0, 50, 100):
+        for value in range(0, 101, 10):
             y = bottom - plot_height * value / 100
-            context.set_source_rgba(0.64, 0.69, 0.76, 0.17)
-            context.set_line_width(1)
+            is_major = value % 50 == 0
+            is_mid = value % 20 == 0
+            # Gridline
+            context.set_line_width(0.8 if is_major else 0.5)
+            context.set_source_rgba(
+                0.45, 0.52, 0.62,
+                0.20 if is_major else (0.12 if is_mid else 0.07),
+            )
             context.move_to(left, y)
             context.line_to(right, y)
             context.stroke()
-            context.set_source_rgba(0.64, 0.69, 0.76, 0.68)
-            context.move_to(9, y + 3)
-            context.show_text(str(value))
+            # Small tick mark on left edge
+            context.set_source_rgba(0.50, 0.58, 0.68, 0.35)
+            context.set_line_width(1)
+            context.move_to(left - 4, y)
+            context.line_to(left, y)
+            context.stroke()
+            # Label
+            context.set_source_rgba(
+                0.55, 0.62, 0.72,
+                0.70 if is_major else (0.50 if is_mid else 0.35),
+            )
+            text_str = str(value)
+            extents = context.text_extents(text_str)
+            context.move_to(left - 8 - extents.width, y + 3.5)
+            context.show_text(text_str)
 
-        visible_count = self._visible_sample_count()
+        # ── X-axis gridlines: time ticks every 30 seconds ──
+        total_seconds = minutes * 60
+        tick_interval = 30  # seconds
+        num_ticks = total_seconds // tick_interval
+        for tick in range(num_ticks + 1):
+            seconds_ago = total_seconds - tick * tick_interval
+            x = left + plot_width * tick / max(1, num_ticks)
+            is_minute = seconds_ago % 60 == 0
+            # Vertical gridline
+            context.set_line_width(0.7 if is_minute else 0.4)
+            context.set_source_rgba(
+                0.45, 0.52, 0.62,
+                0.15 if is_minute else 0.07,
+            )
+            context.move_to(x, top)
+            context.line_to(x, bottom)
+            context.stroke()
+            # Small tick mark on bottom edge
+            context.set_source_rgba(0.50, 0.58, 0.68, 0.35)
+            context.set_line_width(1)
+            context.move_to(x, bottom)
+            context.line_to(x, bottom + 4)
+            context.stroke()
+            # Label
+            if is_minute or num_ticks <= 4:
+                context.set_source_rgba(0.55, 0.62, 0.72, 0.60)
+                if seconds_ago == 0:
+                    time_label = "now"
+                elif seconds_ago < 60:
+                    time_label = f"-{seconds_ago}s"
+                else:
+                    m = seconds_ago // 60
+                    s = seconds_ago % 60
+                    time_label = f"-{m}m" if s == 0 else f"-{m}m{s:02d}s"
+                extents = context.text_extents(time_label)
+                label_x = x - extents.width / 2
+                label_x = max(left, min(right - extents.width, label_x))
+                context.move_to(label_x, bottom + 15)
+                context.show_text(time_label)
+
+        # ── Axis labels ──
+        # Y-axis label (rotated)
+        context.save()
+        context.set_font_size(9)
+        context.set_source_rgba(0.50, 0.58, 0.68, 0.60)
+        y_label = "Usage (%)"
+        extents = context.text_extents(y_label)
+        context.move_to(10, top + plot_height / 2 + extents.width / 2)
+        context.rotate(-1.5708)  # -90 degrees
+        context.show_text(y_label)
+        context.restore()
+
+        # X-axis label
+        context.set_font_size(9)
+        context.set_source_rgba(0.50, 0.58, 0.68, 0.60)
+        x_label = "Time"
+        extents = context.text_extents(x_label)
+        context.move_to(left + plot_width / 2 - extents.width / 2, height - 6)
+        context.show_text(x_label)
+
+        # ── Plot border ──
+        context.set_source_rgba(0.30, 0.38, 0.48, 0.30)
+        context.set_line_width(1.0)
+        context.rectangle(left, top, plot_width, plot_height)
+        context.stroke()
+
+        # ── Draw data series ──
+        # Collect tooltip data while drawing
+        tooltip_data = []
         for key, (title, colour, scale, _kind) in self.METRICS.items():
             if key not in self.device_visible_metrics:
                 continue
@@ -399,6 +608,8 @@ class DevicePage:
                 points.append((x, y))
             if len(points) >= 2:
                 first_x, last_x = points[0][0], points[-1][0]
+
+                # Fill gradient under the curve
                 context.move_to(first_x, bottom)
                 context.line_to(*points[0])
                 for point_index in range(1, len(points)):
@@ -411,19 +622,151 @@ class DevicePage:
                     context.curve_to(*cp1, *cp2, *p2)
                 context.line_to(last_x, bottom)
                 context.close_path()
-                context.set_source_rgba(red, green, blue, 0.09)
-                context.fill_preserve()
+
+                fill_gradient = cairo.LinearGradient(0, top, 0, bottom)
+                fill_gradient.add_color_stop_rgba(0, red, green, blue, 0.14)
+                fill_gradient.add_color_stop_rgba(1, red, green, blue, 0.01)
+                context.set_source(fill_gradient)
+                context.fill()
+
+                # Redraw curve for the stroke
+                context.move_to(*points[0])
+                for point_index in range(1, len(points)):
+                    p0 = points[max(0, point_index - 2)]
+                    p1 = points[point_index - 1]
+                    p2 = points[point_index]
+                    p3 = points[min(len(points) - 1, point_index + 1)]
+                    cp1 = (p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6)
+                    cp2 = (p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6)
+                    context.curve_to(*cp1, *cp2, *p2)
+
+                # Glow pass
+                context.set_line_width(3.5)
+                context.set_source_rgba(red, green, blue, 0.15)
+                context.stroke_preserve()
+
+                # Main line
+                context.set_line_width(1.6)
                 context.set_source_rgba(red, green, blue, 0.92)
                 context.stroke()
 
-        context.set_source_rgba(0.64, 0.69, 0.76, 0.7)
-        context.move_to(left, 9)
-        context.show_text("RECENT RANGE")
-        context.move_to(left, height - 8)
-        minutes = self._visible_sample_count() // 60
-        context.show_text(f"{minutes} minute{'s' if minutes != 1 else ''} ago")
-        context.move_to(max(left + 50, right - 29), height - 8)
-        context.show_text("NOW")
+                # Latest value dot
+                last_point = points[-1]
+                context.set_source_rgba(red, green, blue, 0.25)
+                context.arc(last_point[0], last_point[1], 4.5, 0, 6.2832)
+                context.fill()
+                context.set_source_rgba(red, green, blue, 0.95)
+                context.arc(last_point[0], last_point[1], 2.2, 0, 6.2832)
+                context.fill()
+
+            # Collect for tooltip: map sample index → x position, store samples
+            tooltip_data.append((key, title, colour, samples, denominator, left, plot_width))
+
+        # ── Hover tooltip ──
+        hover_x = getattr(self, "device_chart_hover_x", -1)
+        hover_y = getattr(self, "device_chart_hover_y", -1)
+        if left <= hover_x <= right and top <= hover_y <= bottom and tooltip_data:
+            # Draw crosshair line
+            context.set_source_rgba(0.70, 0.76, 0.84, 0.30)
+            context.set_line_width(0.8)
+            context.move_to(hover_x, top)
+            context.line_to(hover_x, bottom)
+            context.stroke()
+
+            # Find the sample index closest to the hover x position
+            # Use the first series to figure out the sample mapping
+            _key0, _title0, _colour0, samples0, denom0, left0, pw0 = tooltip_data[0]
+            if denom0 > 0 and pw0 > 0:
+                hover_index = round((hover_x - left0) / pw0 * denom0)
+                hover_index = max(0, min(denom0, hover_index))
+
+                # Collect visible metric values at this index
+                lines = []
+                for key, title, colour, samples, _denom, _l, _pw in tooltip_data:
+                    if key not in self.device_visible_metrics:
+                        continue
+                    if 0 <= hover_index < len(samples) and samples[hover_index] is not None:
+                        formatted = self._format_metric(key, samples[hover_index])
+                        lines.append((title, formatted, colour))
+
+                if lines:
+                    # Compute time ago
+                    total_samples = len(samples0)
+                    samples_from_now = max(0, total_samples - 1 - hover_index)
+                    seconds_ago_hover = samples_from_now  # 1 sample per second
+                    if seconds_ago_hover == 0:
+                        time_text = "Now"
+                    elif seconds_ago_hover < 60:
+                        time_text = f"{seconds_ago_hover}s ago"
+                    else:
+                        m_ago = seconds_ago_hover // 60
+                        s_ago = seconds_ago_hover % 60
+                        time_text = f"{m_ago}m {s_ago:02d}s ago"
+
+                    # Measure tooltip size
+                    context.set_font_size(9.5)
+                    max_title_w = 0
+                    max_value_w = 0
+                    for title, formatted, _c in lines:
+                        te = context.text_extents(title)
+                        max_title_w = max(max_title_w, te.width)
+                        ve = context.text_extents(formatted)
+                        max_value_w = max(max_value_w, ve.width)
+                    time_extents = context.text_extents(time_text)
+
+                    tooltip_w = max(max_title_w + max_value_w + 40, time_extents.width + 24)
+                    line_height = 16
+                    tooltip_h = 10 + 16 + 6 + len(lines) * line_height + 8
+                    tooltip_x = hover_x + 14
+                    tooltip_y = hover_y - tooltip_h / 2
+
+                    # Keep tooltip within the chart area
+                    if tooltip_x + tooltip_w > right - 4:
+                        tooltip_x = hover_x - tooltip_w - 14
+                    tooltip_y = max(top + 2, min(bottom - tooltip_h - 2, tooltip_y))
+
+                    # Draw tooltip background
+                    self._draw_rounded_rect(context, tooltip_x, tooltip_y, tooltip_w, tooltip_h, 6)
+                    context.set_source_rgba(0.05, 0.07, 0.10, 0.92)
+                    context.fill_preserve()
+                    context.set_source_rgba(0.35, 0.42, 0.52, 0.55)
+                    context.set_line_width(1)
+                    context.stroke()
+
+                    # Time header
+                    context.set_source_rgba(0.65, 0.72, 0.82, 0.85)
+                    context.set_font_size(9)
+                    context.move_to(tooltip_x + 10, tooltip_y + 15)
+                    context.show_text(time_text)
+
+                    # Metric lines
+                    context.set_font_size(9.5)
+                    for i, (title, formatted, colour) in enumerate(lines):
+                        line_y = tooltip_y + 10 + 16 + 4 + i * line_height
+                        r, g, b = self._hex_rgb(colour)
+                        # Colour dot
+                        context.set_source_rgba(r, g, b, 0.95)
+                        context.arc(tooltip_x + 14, line_y + 2, 3, 0, 6.2832)
+                        context.fill()
+                        # Title
+                        context.set_source_rgba(0.78, 0.83, 0.90, 0.90)
+                        context.move_to(tooltip_x + 22, line_y + 5)
+                        context.show_text(title)
+                        # Value (right-aligned)
+                        ve = context.text_extents(formatted)
+                        context.set_source_rgba(0.95, 0.97, 1.0, 0.95)
+                        context.move_to(tooltip_x + tooltip_w - 10 - ve.width, line_y + 5)
+                        context.show_text(formatted)
+
+    @staticmethod
+    def _draw_rounded_rect(context, x, y, w, h, r):
+        """Draw a rounded rectangle path."""
+        context.new_sub_path()
+        context.arc(x + w - r, y + r, r, -math.pi / 2, 0)
+        context.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+        context.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+        context.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+        context.close_path()
 
     def _format_metric(self, key, value):
         if value is None:

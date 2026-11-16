@@ -113,39 +113,46 @@ window headerbar button { box-shadow: none; }
 window .header-title { color: #f4f5f8; font-size: 15px; font-weight: 600; letter-spacing: 0; }
 window .monitor-value { font-size: 15px; font-weight: 800; }
 window .surface.monitor-card { padding: 20px 4px; background: transparent; border: 0; border-radius: 0; }
-window .monitor-panel-title { color: #f4f5f8; font-size: 28px; font-weight: 400; }
+window .monitor-panel-title { color: #f4f5f8; font-size: 22px; font-weight: 600; letter-spacing: 0.3px; }
 window .monitor-header { color: #f4f5f8; font-size: 17px; font-weight: 700; }
 window .device-hero { min-height: 205px; padding: 22px; border: 1px solid #303641; border-radius: 12px; background: #0b0e13; }
 window .device-hero-copy { background: linear-gradient(90deg, rgba(9, 11, 16, .97), rgba(9, 11, 16, .82) 56%, rgba(9, 11, 16, .08)); padding: 18px; }
-window .device-tabs { min-height: 38px; border-bottom: 1px solid #343b46; }
-window button.device-tab { min-width: 150px; padding: 8px 14px; color: #929cab; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; font-size: 12px; font-weight: 700; }
-window button.device-tab:hover { color: #f2f4f7; background: rgba(255,255,255,.035); box-shadow: none; }
+window .device-tabs { min-height: 42px; padding: 0 4px; border-bottom: 1px solid #2a3240; }
+window button.device-tab { min-width: 160px; padding: 10px 18px; color: #7d8a9d; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; font-size: 12px; font-weight: 700; letter-spacing: 0.3px; }
+window button.device-tab:hover { color: #e8ecf2; background: rgba(255,255,255,.03); box-shadow: none; }
 window button.device-tab:checked { color: #ff5268; border-bottom-color: #ff334f; box-shadow: none; }
-window .resource-toolbar { min-height: 38px; }
-window .resource-recording { color: #ff5268; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
-window .resource-toolbar-label { color: #8892a0; font-size: 9px; font-weight: 800; letter-spacing: 1px; }
-window button.resource-record-button { min-width: 72px; min-height: 29px; padding: 3px 12px; color: #e4e8ed; background: #171c24; border: 1px solid #59616c; border-radius: 3px; box-shadow: none; font-size: 11px; }
-window button.resource-record-button:hover { background: #222a34; box-shadow: none; }
-window .resource-monitor-frame { min-height: 520px; background: #080b10; border: 1px solid #343b46; border-radius: 4px; }
-window .resource-chart-wrap { min-width: 420px; padding: 8px; }
-window .resource-chart { min-height: 500px; }
-window .resource-metrics-panel { min-width: 164px; padding: 12px 7px; background: #10151c; border-left: 1px solid #343b46; }
-window .resource-metrics-heading { color: #aeb7c4; font-size: 10px; font-weight: 800; letter-spacing: 1.3px; }
-window .device-resource-detail { color: #86909f; font-size: 10px; }
-window .resource-metric-row { min-height: 26px; border-bottom: 1px solid rgba(120, 128, 142, .12); }
-window .resource-metric-dot { min-width: 12px; font-size: 9px; }
-window .resource-metric-name { color: #c9d0d9; font-size: 10px; }
-window .resource-metric-value { min-width: 58px; color: #f4f5f8; font-size: 10px; font-weight: 700; }
-window .applications-panel { padding: 14px 16px; background: #10151c; border: 1px solid #343b46; border-radius: 4px; }
-window .applications-heading { min-height: 38px; margin-bottom: 10px; }
-window .applications-list-headings { min-height: 34px; padding: 0 12px; border-bottom: 1px solid #424a56; }
-window .device-process-column { color: #8792a1; font-size: 9px; font-weight: 800; letter-spacing: .8px; }
-window .application-row { min-height: 42px; padding: 2px 12px; border-bottom: 1px solid rgba(120, 128, 142, .10); border-radius: 3px; }
-window .application-row:hover { background: rgba(80, 145, 230, .09); }
-window .applications-row-alt { background: rgba(255,255,255,.018); }
-window .device-process-name { color: #e5e8ed; font-size: 12px; }
-window .application-icon { min-width: 22px; color: #aab5c4; }
-window .device-process-value { color: #d4d9e1; font-size: 11px; font-variant-numeric: tabular-nums; }
+window .resource-monitor-header { min-height: 52px; padding: 8px 4px 0; }
+window .resource-toolbar { min-height: 46px; padding: 10px 14px; background: linear-gradient(100deg, rgba(14,18,26,.92), rgba(10,14,22,.92)); border: 1px solid #2c333e; border-radius: 10px; }
+window .resource-toolbar-sep { margin: 4px 2px; background: #3a4252; }
+window .resource-toolbar-item { min-height: 34px; }
+window .resource-toolbar-dropdown { min-height: 34px; min-width: 140px; }
+window .resource-recording { color: #ff5268; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; }
+window .resource-paused { color: #7d8899; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; }
+window .resource-status-pill { min-height: 34px; min-width: 120px; padding: 4px 14px; background: rgba(255,82,104,.06); border: 1px solid rgba(255,82,104,.18); border-radius: 6px; }
+window .resource-toolbar-label { color: #7d8a9d; font-size: 9px; font-weight: 800; letter-spacing: 1.4px; }
+window button.resource-record-button { min-width: 100px; min-height: 34px; padding: 5px 18px; color: #e8ecf2; background: linear-gradient(180deg, #1c2230, #131824); border: 1px solid #4a5468; border-radius: 7px; box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+window button.resource-record-button:hover { background: linear-gradient(180deg, #252d3e, #1a2130); border-color: #6b7a92; box-shadow: 0 3px 12px rgba(0,0,0,.35); }
+window .resource-monitor-frame { min-height: 530px; background: linear-gradient(145deg, #060a10, #0a0e16); border: 1px solid #2a3240; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03); }
+window .resource-chart-wrap { min-width: 420px; padding: 14px 12px 14px 14px; }
+window .resource-chart { min-height: 500px; border-radius: 6px; }
+window .resource-metrics-panel { min-width: 210px; padding: 18px 14px; background: linear-gradient(180deg, #0c1119, #0e1420); border-left: 1px solid #2a3240; border-radius: 0 12px 12px 0; }
+window .resource-metrics-heading { color: #98a4b6; font-size: 10px; font-weight: 800; letter-spacing: 1.6px; }
+window .device-resource-detail { color: #6e7a8c; font-size: 11px; }
+window .resource-metric-row { min-height: 32px; padding: 4px 6px; border-bottom: 1px solid rgba(120, 130, 150, .08); border-radius: 4px; }
+window .resource-metric-row:hover { background: rgba(80, 130, 220, .06); }
+window .resource-metric-dot { min-width: 14px; font-size: 10px; }
+window .resource-metric-name { color: #c0c9d6; font-size: 11px; font-weight: 500; }
+window .resource-metric-value { min-width: 68px; color: #f0f3f8; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+window .applications-panel { padding: 18px 20px; background: linear-gradient(145deg, #0c1119, #0e1420); border: 1px solid #2a3240; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.3); }
+window .applications-heading { min-height: 42px; margin-bottom: 12px; }
+window .applications-list-headings { min-height: 38px; padding: 0 14px; border-bottom: 1px solid #353e4d; }
+window .device-process-column { color: #7d8a9d; font-size: 9px; font-weight: 800; letter-spacing: 1px; }
+window .application-row { min-height: 46px; padding: 4px 14px; border-bottom: 1px solid rgba(120, 130, 150, .08); border-radius: 4px; transition: background 150ms ease; }
+window .application-row:hover { background: rgba(80, 145, 230, .08); }
+window .applications-row-alt { background: rgba(255,255,255,.015); }
+window .device-process-name { color: #e5e8ed; font-size: 12px; font-weight: 500; }
+window .application-icon { min-width: 24px; color: #9aabbc; }
+window .device-process-value { color: #d4d9e1; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 window .dashboard-top { margin-bottom: 16px; }
 window .dashboard-monitor { min-width: 400px; }
 window .dashboard-monitor-grid { min-width: 400px; }

@@ -37,6 +37,9 @@ install -Dpm 0644 %{_sourcedir}/armoury-crate.svg %{buildroot}%{_datadir}/icons/
 %{_datadir}/icons/hicolor/scalable/apps/armoury-crate.svg
 
 %changelog
+* Wed Nov 25 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.4.1-1
+- Make GUI regression tests skip cleanly when GTK/PyGObject is unavailable
+
 * Tue Nov 24 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.4.0-1
 - Add System Configuration with embedded GPU and Lighting views
 - Improve GPU switching reliability and redesign Device Details

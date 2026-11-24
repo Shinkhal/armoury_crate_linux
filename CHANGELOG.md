@@ -3,6 +3,10 @@
 Notable user-facing changes are listed here. Older release details are
 available in the [GitHub releases](https://github.com/Shinkhal/armoury_crate_linux/releases).
 
+## 0.4.1 — 2026-11-25
+
+- Make GUI regression tests skip cleanly when GTK/PyGObject is not installed in package-build environments.
+
 ## 0.4.0 — 2026-11-24
 
 - Add a System Configuration workspace with embedded GPU Performance and Lighting views.

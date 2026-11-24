@@ -11,7 +11,10 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, "src")
 try:
     from pages import gpu
-except ImportError:
+except Exception:
+    # The package-build job intentionally runs the hardware tests without
+    # installing GTK/PyGObject. GUI-specific tests are skipped there; the
+    # smoke-test job exercises the real GTK import path separately.
     gpu = None
 
 

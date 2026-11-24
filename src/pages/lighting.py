@@ -1,5 +1,6 @@
 """Lighting page UI and interactions."""
 import math
+import json
 import os
 import subprocess
 
@@ -13,6 +14,31 @@ from config import *
 from components.widgets import *
 from hardware.asus import *
 from hardware.system import *
+
+
+LIGHTING_STATE_PATH = os.path.join(GLib.get_user_config_dir(), "armoury-crate", "lighting-state.json")
+
+
+def load_lighting_state():
+    try:
+        with open(LIGHTING_STATE_PATH, encoding="utf-8") as stream:
+            state = json.load(stream)
+        if not isinstance(state, dict):
+            return {}
+        return state
+    except (OSError, ValueError):
+        return {}
+
+
+def save_lighting_state(state):
+    try:
+        os.makedirs(os.path.dirname(LIGHTING_STATE_PATH), exist_ok=True)
+        temporary_path = LIGHTING_STATE_PATH + ".tmp"
+        with open(temporary_path, "w", encoding="utf-8") as stream:
+            json.dump(state, stream, separators=(",", ":"))
+        os.replace(temporary_path, LIGHTING_STATE_PATH)
+    except OSError:
+        pass
 
 
 class LightingPage:
@@ -41,7 +67,9 @@ class LightingPage:
         effects_grid.set_row_spacing(7)
         effects_grid.set_column_homogeneous(True)
         self.effect_buttons = {}
-        self.current_effect = "static"
+        self.lighting_state = load_lighting_state()
+        saved_effect = self.lighting_state.get("effect", "static")
+        self.current_effect = saved_effect if saved_effect in EFFECT_OPTIONS else "static"
         self.syncing_effect = True
         previous = None
         effect_icons = {
@@ -103,8 +131,10 @@ class LightingPage:
 
         settings.append(label("COLOR", "lighting-control-heading"))
         self.colour_controls = {}
-        self.primary_colour_group = self.build_colour_control("Primary", "primary", AURA_DEFAULT_COLOUR)
-        self.secondary_colour_group = self.build_colour_control("Secondary", "secondary", "1769ff")
+        primary_colour = self._saved_colour("primary", AURA_DEFAULT_COLOUR)
+        secondary_colour = self._saved_colour("secondary", "1769ff")
+        self.primary_colour_group = self.build_colour_control("Primary", "primary", primary_colour)
+        self.secondary_colour_group = self.build_colour_control("Secondary", "secondary", secondary_colour)
         settings.append(self.primary_colour_group)
         settings.append(self.secondary_colour_group)
 
@@ -114,7 +144,8 @@ class LightingPage:
         self.speed_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, len(AURA_SPEEDS) - 1, 1)
         self.speed_scale.set_draw_value(False)
         self.speed_scale.set_round_digits(0)
-        self.speed_scale.set_value(1)
+        saved_speed = self.lighting_state.get("speed", 1)
+        self.speed_scale.set_value(saved_speed if isinstance(saved_speed, int) and 0 <= saved_speed < len(AURA_SPEEDS) else 1)
         self.speed_scale.add_mark(0, Gtk.PositionType.BOTTOM, "Low")
         self.speed_scale.add_mark(1, Gtk.PositionType.BOTTOM, "Medium")
         self.speed_scale.add_mark(2, Gtk.PositionType.BOTTOM, "High")
@@ -141,7 +172,10 @@ class LightingPage:
             button.connect("toggled", self.on_direction_button_toggled, index)
             direction_buttons.append(button)
             self.direction_buttons.append(button)
-        self.direction_buttons[2].set_active(True)
+        saved_direction = self.lighting_state.get("direction", 2)
+        if not isinstance(saved_direction, int) or not 0 <= saved_direction < len(self.direction_buttons):
+            saved_direction = 2
+        self.direction_buttons[saved_direction].set_active(True)
         self.direction_row.append(direction_buttons)
         settings.append(self.direction_row)
 
@@ -172,7 +206,45 @@ class LightingPage:
         c.append(layout)
 
         self.on_effect_selected(self.current_effect)
+        self.refresh_lighting_state()
         return outer
+
+    def _saved_colour(self, slot, default):
+        value = self.lighting_state.get(slot, default)
+        if isinstance(value, str) and len(value.lstrip("#")) == 6:
+            try:
+                int(value.lstrip("#"), 16)
+                return value.lstrip("#").lower()
+            except ValueError:
+                pass
+        return default
+
+    def refresh_lighting_state(self):
+        """Read keyboard brightness from the kernel's live LED state."""
+        brightness_path = "/sys/class/leds/asus::kbd_backlight/brightness"
+        maximum_path = "/sys/class/leds/asus::kbd_backlight/max_brightness"
+        try:
+            with open(brightness_path, encoding="utf-8") as stream:
+                brightness = int(stream.read().strip())
+            with open(maximum_path, encoding="utf-8") as stream:
+                maximum = int(stream.read().strip())
+        except (OSError, ValueError):
+            saved_level = self.lighting_state.get("brightness")
+            if isinstance(saved_level, int) and 0 <= saved_level <= 3:
+                self.syncing_brightness = True
+                self.brightness_scale.set_value(saved_level)
+                self.syncing_brightness = False
+                self.last_brightness_level = saved_level
+                self.on_brightness_scale_changed(self.brightness_scale)
+            return
+        if maximum <= 0:
+            return
+        level = max(0, min(3, round(brightness * 3 / maximum)))
+        self.syncing_brightness = True
+        self.brightness_scale.set_value(level)
+        self.syncing_brightness = False
+        self.last_brightness_level = level
+        self.on_brightness_scale_changed(self.brightness_scale)
 
     @staticmethod
     def _lighting_icon(icon_name, fallback, size):
@@ -380,6 +452,14 @@ class LightingPage:
         result = command(args)
         if result.returncode == 0:
             self.effect_feedback.set_text(f"{EFFECT_LABELS[effect]} effect applied")
+            self.lighting_state.update({
+                "effect": effect,
+                "primary": self.colour_controls["primary"]["hex"],
+                "secondary": self.colour_controls["secondary"]["hex"],
+                "speed": round(self.speed_scale.get_value()),
+                "direction": next((index for index, button in enumerate(self.direction_buttons) if button.get_active()), 2),
+            })
+            save_lighting_state(self.lighting_state)
         else:
             self.effect_feedback.set_text("Could not apply lighting effect")
             self.toast("Could not apply effect: " + ((result.stderr or result.stdout).strip() or "asusctl error"))
@@ -392,6 +472,8 @@ class LightingPage:
         result = command(["asusctl", "leds", "set", level])
         if result.returncode == 0:
             self.brightness_feedback.set_text(f"Keyboard backlight set to {level}.")
+            self.lighting_state["brightness"] = value
+            save_lighting_state(self.lighting_state)
         else:
             self.brightness_feedback.set_text(f"Could not set keyboard backlight to {level}.")
             self.toast("Could not set backlight: " + ((result.stderr or result.stdout).strip() or "asusctl error"))

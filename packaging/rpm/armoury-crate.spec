@@ -37,6 +37,11 @@ install -Dpm 0644 %{_sourcedir}/armoury-crate.svg %{buildroot}%{_datadir}/icons/
 %{_datadir}/icons/hicolor/scalable/apps/armoury-crate.svg
 
 %changelog
+* Tue Nov 24 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.4.0-1
+- Add System Configuration with embedded GPU and Lighting views
+- Improve GPU switching reliability and redesign Device Details
+- Remove redundant Operating Mode navigation
+
 * Mon Nov 16 2026 Shinkhal Sinha <shinkhalsinha@gmail.com> - 0.3.0-1
 - Add the Device Details view with CPU, memory, GPU, and storage telemetry
 - Persist SMART data until the user requests a refresh and install smartmontools

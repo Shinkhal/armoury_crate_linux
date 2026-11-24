@@ -3,6 +3,13 @@
 Notable user-facing changes are listed here. Older release details are
 available in the [GitHub releases](https://github.com/Shinkhal/armoury_crate_linux/releases).
 
+## 0.4.0 — 2026-11-24
+
+- Add a System Configuration workspace with embedded GPU Performance and Lighting views.
+- Improve GPU mode backend selection, asynchronous switching, restart prompting, and post-reboot state reporting.
+- Redesign Device Details and remove the redundant Operating Mode page.
+- Improve capability detection and touchpad control through desktop settings.
+
 ## 0.3.0 — 2026-11-16
 
 - Add a Device Details view for processor, memory, graphics, and physical-drive

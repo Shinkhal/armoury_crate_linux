@@ -239,11 +239,15 @@ class DevicePage:
         return page
 
     def _build_device_details_page(self):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        page.set_margin_top(18)
-        page.set_margin_bottom(14)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        page.set_margin_top(14)
+        page.set_margin_bottom(18)
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        header.append(label("DEVICE DETAILS", "resource-metrics-heading"))
+        header_copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        header_copy.append(label("HARDWARE", "eyebrow"))
+        header_copy.append(label("Device Details", "monitor-panel-title"))
+        header_copy.append(label("Detected hardware, live readings, and storage health.", "device-resource-detail"))
+        header.append(header_copy)
         header.append(Gtk.Box(hexpand=True))
         self.device_details_updated = label("SMART cached", "device-resource-detail")
         self.device_details_updated.set_single_line_mode(True)
@@ -256,7 +260,23 @@ class DevicePage:
         header.append(self.device_smart_refresh_button)
         page.append(header)
 
-        grid = Gtk.Grid(column_spacing=28, row_spacing=0)
+        overview = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        overview.add_css_class("device-details-overview")
+        overview.append(self._device_icon("computer-symbolic", "computer", 34))
+        overview_copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        overview_copy.set_hexpand(True)
+        overview_copy.append(label("HARDWARE OVERVIEW", "eyebrow"))
+        overview_copy.append(label(cpu_model(), "device-details-overview-title"))
+        overview_copy.append(label("Live values are read from the kernel, firmware, and available drivers.", "device-details-overview-copy"))
+        overview.append(overview_copy)
+        overview_status = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        overview_status.set_halign(Gtk.Align.END)
+        overview_status.append(label("DEVICE STATUS", "device-details-overview-label"))
+        overview_status.append(label("CONNECTED", "device-details-overview-status"))
+        overview.append(overview_status)
+        page.append(overview)
+
+        grid = Gtk.Grid(column_spacing=16, row_spacing=16)
         grid.set_column_homogeneous(True)
         self.device_detail_values = {}
         self.device_detail_rows = {}

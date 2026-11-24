@@ -16,6 +16,27 @@ window .nav-section { color: #68707d; font-size: 9px; font-weight: 800; letter-s
 window .page-title { font-size: 28px; font-weight: 800; color: #f8f8fa; }
 window .eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 2px; color: #ff5268; }
 window .subtle { color: #9097a5; }
+window .diagnostic-panel { margin-top: 10px; background: #111419; border: 1px solid #2b303a; border-radius: 10px; padding: 4px 18px; }
+window .diagnostic-row { min-height: 62px; padding: 10px 2px; border-bottom: 1px solid #252a33; }
+window .diagnostic-row:last-child { border-bottom: 0; }
+window .diagnostic-title { color: #e8eaf0; font-size: 13px; font-weight: 750; }
+window .diagnostic-detail { color: #7f8795; font-size: 10px; }
+window .diagnostic-value { color: #74d6a0; font-size: 12px; font-weight: 800; }
+window button.secondary-button { min-height: 38px; padding: 8px 15px; color: #d5dae3; background: #1b2029; border: 1px solid #353c48; border-radius: 7px; box-shadow: none; }
+window button.secondary-button:hover { background: #252b36; border-color: #566171; box-shadow: none; }
+window .system-config-tabs { margin-top: 8px; margin-bottom: 18px; border-bottom: 1px solid #30333b; }
+window button.system-config-tab { min-height: 44px; padding: 0 18px; color: #858b98; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; font-size: 13px; font-weight: 700; }
+window button.system-config-tab:hover { color: #f5f6f8; background: rgba(255,255,255,.04); }
+window button.system-config-tab.selected { color: #f5f6f8; border-bottom-color: #ff334f; background: linear-gradient(180deg, transparent, rgba(229,43,69,.13)); }
+window .system-config-grid { margin: 8px 6px 24px; }
+window button.system-config-card { min-height: 230px; padding: 22px 16px 18px; background: #171717; border: 1px solid #25262b; border-radius: 0; border-bottom: 3px solid #e52b45; box-shadow: none; }
+window button.system-config-card:hover { background: #1d1d1f; border-color: #44464d; box-shadow: none; }
+window button.system-config-card.unavailable { opacity: .92; }
+window .system-config-artwork { min-width: 74px; min-height: 74px; border: 0; background: transparent; }
+window .system-config-icon { color: #f1f1f3; }
+window .system-config-title { color: #e7e7ea; font-size: 15px; font-weight: 750; }
+window .system-config-description { min-height: 34px; color: #97979e; font-size: 11px; }
+window .system-config-status { color: #73747c; font-size: 9px; font-weight: 700; letter-spacing: .8px; }
 window .surface.hero { background: #101114; border: 0; border-radius: 0; padding: 22px; }
 window .hero-title { font-size: 23px; font-weight: 800; }
 window .hero-device { font-size: 27px; font-weight: 900; }
@@ -25,14 +46,9 @@ window .hero-value { font-size: 13px; font-weight: 900; color: #ff465d; letter-s
 window .surface { background: #151820; border: 1px solid #292e39; border-radius: 12px; padding: 17px; }
 window .surface-title { color: #858d9c; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
 window .surface-value { color: #f4f5f8; font-size: 21px; font-weight: 750; }
-window button.profile-card { background: #151820; border: 1px solid #2a2f39; border-radius: 12px; padding: 16px; box-shadow: none; }
-window button.profile-card:hover { border-color: #777f8e; background: #1b1e27; box-shadow: none; }
-window button.profile-card.active { border: 1px solid #ff4059; background: #26161c; box-shadow: none; }
 window button.quick-link { background: #151820; border: 1px solid #292e39; border-radius: 9px; color: #e9ebef; padding: 11px 14px; box-shadow: none; }
 window button.quick-link:hover { background: #1b1e27; border-color: #555d6b; color: #fff; box-shadow: none; }
 window .profile-symbol { font-size: 20px; color: #ff465d; font-weight: 900; }
-window .profile-badge { min-width: 46px; min-height: 46px; border-radius: 999px; background: rgba(229, 43, 69, 0.10); border: 1px solid rgba(229, 43, 69, 0.45); }
-window button.profile-card.active .profile-badge { background: rgba(229, 43, 69, 0.22); border-color: #ff4059; }
 window .battery-hero { background: linear-gradient(110deg, #11151c, #171b22); border: 1px solid #303641; border-radius: 12px; padding: 22px; }
 window .battery-hero-title { font-size: 24px; font-weight: 850; }
 window .battery-hero-copy { color: #a7afbd; font-size: 12px; }
@@ -50,8 +66,6 @@ window .battery-mode-limit { color: #ff5268; font-size: 20px; font-weight: 900; 
 window .battery-mode-card.active .battery-mode-limit { color: #fff; }
 window .battery-mode-description { color: #9aa2b1; font-size: 11px; }
 window .battery-mode-caption { color: #68707d; font-size: 10px; font-weight: 700; letter-spacing: .5px; }
-window .profile-name { font-size: 15px; font-weight: 800; }
-window .profile-desc { color: #9299a7; font-size: 11px; }
 window button.accent-button { background-color: #e52b45; background-image: none; color: #ffffff; font-weight: 800; border: 0; border-radius: 8px; padding: 9px 18px; box-shadow: none; }
 window button.accent-button:hover { background-color: #fa3c56; background-image: none; box-shadow: none; }
 window scale.ac-slider trough highlight { background-color: #e52b45; background-image: none; }
@@ -118,6 +132,29 @@ window .monitor-header { color: #f4f5f8; font-size: 17px; font-weight: 700; }
 window .device-hero { min-height: 205px; padding: 22px; border: 1px solid #303641; border-radius: 12px; background: #0b0e13; }
 window .device-hero-copy { background: linear-gradient(90deg, rgba(9, 11, 16, .97), rgba(9, 11, 16, .82) 56%, rgba(9, 11, 16, .08)); padding: 18px; }
 window .device-tabs { min-height: 42px; padding: 0 4px; border-bottom: 1px solid #2a3240; }
+window .gpu-device-header { min-height: 74px; padding: 0 2px 10px; }
+window .gpu-device-title { color: #f1f3f6; font-size: 25px; font-weight: 800; }
+window .gpu-current-badge { padding: 9px 13px; color: #b9c0cc; background: #101217; border: 1px solid #30343b; border-radius: 2px; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+window .gpu-tabs { min-height: 44px; border-bottom: 1px solid #27292d; }
+window button.gpu-tab { min-width: 0; min-height: 43px; padding: 8px 15px; color: #afb2b9; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; font-size: 12px; font-weight: 600; }
+window button.gpu-tab:hover { color: #fff; background: rgba(255,255,255,.025); box-shadow: none; }
+window button.gpu-tab.selected { color: #f4f5f8; border-bottom-color: #68cbd1; }
+window button.gpu-tab:disabled { color: #74767c; }
+window button.gpu-tab.selected:disabled { color: #f4f5f8; }
+window .gpu-section-title { color: #f32650; font-size: 20px; font-weight: 650; }
+window .gpu-mode-grid { margin: 0 10px; }
+window button.gpu-mode-card { min-width: 0; min-height: 218px; padding: 13px 17px 11px; color: #f1f2f5; background: rgba(5,6,8,.88); border: 1px solid #393b40; border-radius: 0; box-shadow: none; }
+window button.gpu-mode-card:hover { background: #0b0c10; border-color: #73767d; box-shadow: none; }
+window button.gpu-mode-card.active { background: linear-gradient(180deg, rgba(41,9,22,.91), rgba(9,7,11,.96)); border: 1px solid #ff0752; box-shadow: inset 0 0 22px rgba(255,0,75,.19), 0 0 13px rgba(255,0,75,.1); }
+window button.gpu-mode-card.pending { background: linear-gradient(180deg, rgba(41,9,22,.6), rgba(9,7,11,.96)); border: 1px dashed #ff0752; box-shadow: inset 0 0 18px rgba(255,0,75,.13); }
+window button.gpu-mode-card:disabled { color: #8d9097; opacity: .63; }
+window .gpu-mode-badge-icon { padding: 2px; color: #d0d2d7; background: #111216; border-radius: 99px; }
+window button.gpu-mode-card.active .gpu-mode-badge-icon { color: #ff1958; background: #211019; }
+window .gpu-mode-title { min-height: 26px; color: #f2f3f6; font-size: 17px; font-weight: 650; }
+window .gpu-mode-description { min-height: 58px; color: #a5a7ad; font-size: 11px; line-height: 1.25; }
+window .gpu-mode-status { min-height: 15px; color: #787b82; font-size: 9px; font-weight: 800; letter-spacing: .8px; }
+window button.gpu-mode-card.active .gpu-mode-status, window button.gpu-mode-card.pending .gpu-mode-status { color: #ff4b78; }
+window .gpu-mode-feedback { color: #858992; font-size: 11px; }
 window button.device-tab { min-width: 160px; padding: 10px 18px; color: #7d8a9d; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; font-size: 12px; font-weight: 700; letter-spacing: 0.3px; }
 window button.device-tab:hover { color: #e8ecf2; background: rgba(255,255,255,.03); box-shadow: none; }
 window button.device-tab:checked { color: #ff5268; border-bottom-color: #ff334f; box-shadow: none; }
@@ -144,16 +181,22 @@ window .resource-metric-dot { min-width: 14px; font-size: 10px; }
 window .resource-metric-name { color: #c0c9d6; font-size: 11px; font-weight: 500; }
 window .resource-metric-value { min-width: 68px; color: #f0f3f8; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 window .applications-panel { padding: 18px 20px; background: linear-gradient(145deg, #0c1119, #0e1420); border: 1px solid #2a3240; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.3); }
-window .device-details-section { min-width: 260px; padding: 14px 4px 16px; }
-window .device-details-cpu { padding-right: 22px; border-right: 1px solid #252d39; }
-window .device-details-memory { padding-left: 22px; }
-window .device-details-gpu { margin-top: 2px; border-top: 1px solid #252d39; }
-window .device-details-storage { border-top: 1px solid #252d39; }
-window .device-details-heading { min-height: 26px; margin-bottom: 8px; }
+window .device-details-section { min-width: 260px; padding: 18px 18px 20px; background: #151820; border: 1px solid #2b303b; border-radius: 10px; }
+window .device-details-overview { min-height: 82px; padding: 18px 20px; background: linear-gradient(105deg, #171b25, #10131a); border: 1px solid #303846; border-radius: 10px; }
+window .device-details-overview > image { color: #ff5268; }
+window .device-details-overview-title { color: #f3f5f8; font-size: 18px; font-weight: 800; }
+window .device-details-overview-copy { color: #8993a3; font-size: 11px; }
+window .device-details-overview-label { color: #7d8798; font-size: 9px; font-weight: 800; letter-spacing: 1.2px; }
+window .device-details-overview-status { color: #6bd49c; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+window .device-details-cpu { }
+window .device-details-memory { }
+window .device-details-gpu { margin-top: 0; }
+window .device-details-storage { }
+window .device-details-heading { min-height: 30px; margin-bottom: 12px; padding-bottom: 9px; border-bottom: 1px solid #2a303b; }
 window .device-details-icon { color: #e52b45; }
-window .device-detail-name { min-width: 126px; color: #7d8a9d; font-size: 11px; }
-window .device-detail-value { color: #e5e8ed; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
-window .device-storage-row { padding: 10px 0; border-top: 1px solid rgba(120,130,150,.16); }
+window .device-detail-name { min-width: 126px; color: #8b95a5; font-size: 11px; }
+window .device-detail-value { color: #f0f2f6; font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+window .device-storage-row { padding: 12px 0 2px; border-top: 1px solid rgba(120,130,150,.16); }
 window .applications-heading { min-height: 42px; margin-bottom: 12px; }
 window .applications-list-headings { min-height: 38px; padding: 0 14px; border-bottom: 1px solid #353e4d; }
 window .device-process-column { color: #7d8a9d; font-size: 9px; font-weight: 800; letter-spacing: 1px; }
@@ -226,8 +269,6 @@ window .dashboard-value-large { font-size: __FONT_SIZE_DASHBOARD_READING__px; fo
 window button.mode-option { background: transparent; border: 0; border-bottom: 1px solid #34363b; border-radius: 0; padding: 12px 10px 16px; box-shadow: none; }
 window button.mode-option:hover { background: #141417; box-shadow: none; }
 window button.mode-option.active { background: linear-gradient(180deg, transparent, rgba(220, 26, 47, .13)); border-bottom: 3px solid #e52b45; }
-window .mode-option .profile-badge { min-width: 36px; min-height: 36px; background: transparent; border: 0; }
-window .mode-option .profile-symbol { font-size: 22px; }
 window levelbar.ac-level trough { background: #232833; border: none; border-radius: 2px; padding: 0; }
 window levelbar.ac-level block { min-height: 4px; border: none; border-radius: 2px; padding: 0; }
 window levelbar.ac-level block.filled { background: linear-gradient(90deg, #8a63ff, #ff4059); }

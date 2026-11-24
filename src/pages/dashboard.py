@@ -1,6 +1,5 @@
 """Dashboard page UI and interactions."""
 import math
-import json
 import os
 import subprocess
 
@@ -8,7 +7,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+from gi.repository import Adw, Gio, Gtk
 
 from config import *
 from components.widgets import *
@@ -47,11 +46,13 @@ class DashboardPage:
         system_strip.append(system_heading)
         device_name = pretty_product_name(text("/sys/class/dmi/id/product_name", "ASUS laptop"))
         dgpu, igpu = gpu_names()
+        graphics_names = [name for name in (igpu, dgpu) if name != "Integrated graphics"]
+        graphics_name = " · ".join(dict.fromkeys(graphics_names)) or "Integrated graphics"
         system_details = (
             ("DEVICE", device_name, "computer-symbolic"),
             ("PROCESSOR", cpu_model(), "utilities-system-monitor-symbolic"),
-            ("GRAPHICS", f"{igpu} · {dgpu}", "video-display-symbolic"),
-            ("SYSTEM", f"{os_pretty_name()} · {os.uname().release}", "preferences-system-details-symbolic"),
+            ("GRAPHICS", graphics_name, "video-display-symbolic"),
+            ("SYSTEM", os_pretty_name(), "preferences-system-details-symbolic"),
         )
         system_details_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         for index, (title, value, icon_name) in enumerate(system_details):
@@ -121,7 +122,7 @@ class DashboardPage:
         cards.set_vexpand(True)
         cards.add_css_class("dashboard-tiles")
         self.dashboard_tile_widgets = {}
-        self.dashboard_tile_order = self.load_dashboard_tile_order()
+        self.dashboard_tile_order = ["cpu_stats", "fans", "memory_storage", "gpu_stats", "app_configuration", "battery", "gpu_mode"]
         self.dashboard_values = {}
 
         cpu_stats = self.dashboard_panel("CPU Stats")
@@ -288,25 +289,8 @@ class DashboardPage:
         outer.append(scroll)
         return outer
 
-    def load_dashboard_tile_order(self):
-        path = os.path.join(GLib.get_user_config_dir(), "armoury-crate", "dashboard-tiles.json")
-        try:
-            with open(path, encoding="utf-8") as stream:
-                saved = json.load(stream)
-            known = ["cpu_stats", "fans", "memory_storage", "gpu_stats", "app_configuration", "battery", "gpu_mode"]
-            return [key for key in saved if key in known] + [key for key in known if key not in saved]
-        except (OSError, ValueError, TypeError):
-            return ["cpu_stats", "fans", "memory_storage", "gpu_stats", "app_configuration", "battery", "gpu_mode"]
-
     def add_dashboard_tile(self, grid, key, widget):
         self.dashboard_tile_widgets[key] = widget
-        widget.set_tooltip_text("Drag to rearrange this tile")
-        source = Gtk.DragSource(actions=Gdk.DragAction.MOVE)
-        source.connect("prepare", self.dashboard_tile_drag_prepare, key)
-        widget.add_controller(source)
-        target = Gtk.DropTarget.new(str, Gdk.DragAction.MOVE)
-        target.connect("drop", self.dashboard_tile_drop, widget)
-        widget.add_controller(target)
 
     def arrange_dashboard_tiles(self, grid):
         for child in tuple(self.dashboard_tile_widgets.values()):
@@ -316,26 +300,6 @@ class DashboardPage:
             tile = self.dashboard_tile_widgets.get(key)
             if tile is not None:
                 grid.attach(tile, position % 3, position // 3, 1, 1)
-
-    def dashboard_tile_drag_prepare(self, _source, _x, _y, key):
-        return Gdk.ContentProvider.new_for_value(key)
-
-    def dashboard_tile_drop(self, _target, dragged_key, _x, _y, destination_widget):
-        destination_key = next((key for key, widget in self.dashboard_tile_widgets.items() if widget is destination_widget), None)
-        if not destination_key or dragged_key == destination_key:
-            return False
-        self.dashboard_tile_order.remove(dragged_key)
-        self.dashboard_tile_order.insert(self.dashboard_tile_order.index(destination_key), dragged_key)
-        grid = destination_widget.get_parent()
-        self.arrange_dashboard_tiles(grid)
-        path = os.path.join(GLib.get_user_config_dir(), "armoury-crate", "dashboard-tiles.json")
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as stream:
-                json.dump(self.dashboard_tile_order, stream)
-        except OSError:
-            pass
-        return True
 
     def dashboard_panel(self, title):
         panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)

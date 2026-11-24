@@ -751,6 +751,12 @@ def gpu_names():
     global _gpu_names
     if _gpu_names is None:
         dgpu = igpu = "Integrated graphics"
+
+        def concise_model(value):
+            value = re.sub(r"\b(?:mobile|max-q)\b", "", value, flags=re.IGNORECASE)
+            value = re.sub(r"\s*/\s*", " ", value)
+            return " ".join(value.split()).strip(" -/")
+
         result = command(["lspci"])
         if result.returncode == 0:
             for line in result.stdout.splitlines():
@@ -760,13 +766,12 @@ def gpu_names():
                     continue
                 description = line.split(":", 2)[-1].strip()
                 if "nvidia" in low:
-                    match = re.search(r"\[([^\]]+)\]", description)
-                    dgpu = match.group(1) if match and "geforce" in match.group(1).lower() else description
+                    match = re.search(r"\[([^\]]*geforce[^\]]*)\]", description, re.IGNORECASE)
+                    dgpu = concise_model(match.group(1) if match else description)
                 elif "amd" in low or "ati" in low:
-                    description = description.replace("Advanced Micro Devices, Inc. [AMD/ATI]", "AMD Radeon Graphics")
-                    description = re.sub(r"\s+\[[0-9a-fA-F]{4}:[0-9a-fA-F]{4}\].*$", "", description)
-                    description = description.split(" (rev ")[0]
-                    igpu = description
+                    match = re.search(r"\[([^\]]*radeon[^\]]*)\]", description, re.IGNORECASE)
+                    model = match.group(1).split("/", 1)[0] if match else "Radeon Graphics"
+                    igpu = "AMD " + concise_model(model)
         _gpu_names = dgpu, igpu
     return _gpu_names
 

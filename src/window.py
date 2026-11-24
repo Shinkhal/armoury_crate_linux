@@ -7,7 +7,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from config import (
-    CHARGE_LIMITS, GPU_MODES, PPD_IFACE, PPD_NAME, PPD_PATH,
+    CHARGE_LIMITS, PPD_IFACE, PPD_NAME, PPD_PATH,
     PROFILE_IDS, TELEMETRY_REFRESH_SECONDS,
 )
 from components.widgets import asus_image, label, page_heading
@@ -26,10 +26,10 @@ from hardware.system import (
 from styles import CSS
 from pages.dashboard import DashboardPage
 from pages.device import DevicePage
-from pages.cooling import CoolingPage
 from pages.battery import BatteryPage
 from pages.lighting import LightingPage
 from pages.gpu import GpuPage
+from pages.system_configuration import SystemConfigurationPage
 
 SIDEBAR_EXPANDED_WIDTH = 130
 SIDEBAR_COLLAPSED_WIDTH = 68
@@ -38,10 +38,10 @@ SIDEBAR_COLLAPSED_WIDTH = 68
 class ArmouryWindow(
     DashboardPage,
     DevicePage,
-    CoolingPage,
     BatteryPage,
     LightingPage,
     GpuPage,
+    SystemConfigurationPage,
     Gtk.ApplicationWindow,
 ):
     def __init__(self, app):
@@ -145,10 +145,8 @@ class ArmouryWindow(
         self.sidebar.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
         self.add_page("home", "Home", "ic_laptop.svg", "computer-symbolic", self.build_home)
         self.add_page("device", "Device", "ic_laptop.svg", "computer-symbolic", self.build_device)
-        self.add_page("lighting", "Aura Sync", "ic_lighting.svg", "night-light-symbolic", self.build_lighting)
-        self.add_page("cooling", "Scenario Profiles", "ic_fan_alt.svg", "preferences-system-symbolic", self.build_cooling)
+        self.add_page("system", "System Configuration", None, "preferences-system-symbolic", self.build_system_configuration)
         self.add_page("battery", "Battery", None, "battery-symbolic", self.build_battery)
-        self.add_page("gpu", "GPU Mode", "ic_gpu.svg", "video-display-symbolic", self.build_gpu)
         self.nav_buttons["home"].set_active(True)
         self.sidebar.append(Gtk.Box(vexpand=True))
         footer = label("Live status · 4 sec refresh", "footer")
@@ -184,6 +182,10 @@ class ArmouryWindow(
         if not button.get_active():
             return
         self.stack.set_visible_child_name(name)
+        if name == "lighting" and hasattr(self, "refresh_lighting_state"):
+            self.refresh_lighting_state()
+        if name == "gpu" and hasattr(self, "refresh_gpu_state"):
+            self.refresh_gpu_state()
         self.header_title.set_text("Armoury Crate")
         for key, other in self.nav_buttons.items():
             if key != name and other.get_active():
@@ -215,6 +217,8 @@ class ArmouryWindow(
                     button.add_css_class("active")
                 else:
                     button.remove_css_class("active")
+        if hasattr(self, "cool_active_value"):
+            self.cool_active_value.set_text(active or "Unavailable")
         for name, button in getattr(self, "dashboard_profile_values", {}).items():
             if name == active:
                 button.add_css_class("active")
@@ -244,8 +248,6 @@ class ArmouryWindow(
         hwmon = fan_hwmon()
         cpu = fan_read(hwmon, "fan1_input")
         gpu_fan = fan_read(hwmon, "fan2_input")
-        self.cpu_fan_value.set_text(rpm(cpu))
-        self.gpu_fan_value.set_text(rpm(gpu_fan))
         if hasattr(self, "dashboard_values"):
             cpu_temp = read_thermal("acpitz")
             gpu = gpu_telemetry()
@@ -370,13 +372,6 @@ class ArmouryWindow(
             self.brightness_feedback.set_text(
                 f"Current keyboard backlight: {brightness_label}."
             )
-        gpu_mode = command(["supergfxctl", "-g"])
-        self.gpu_current_value.set_text(gpu_mode.stdout.strip() if gpu_mode.returncode == 0 else "Unavailable")
-        if hasattr(self, "dashboard_gpu_mode_value"):
-            self.dashboard_gpu_mode_value.set_text(gpu_mode.stdout.strip() if gpu_mode.returncode == 0 else "Unavailable")
-        current_mode = gpu_mode.stdout.strip() if gpu_mode.returncode == 0 else None
-        if current_mode in GPU_MODES:
-            self.gpu_dropdown.set_selected(GPU_MODES.index(current_mode))
         device_name = pretty_product_name(text("/sys/class/dmi/id/product_name", "ASUS laptop"))
         if hasattr(self, "hero_device"):
             self.hero_device.set_text(device_name)

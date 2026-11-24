@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Shinkhal Sinha <shinkhalsinha@gmail.com>
 Standards-Version: 4.6.2
 Package: armoury-crate
-Version: 0.3.0
+Version: 0.4.0
 Architecture: all
 Depends: python3, python3-gi, python3-cairo, gir1.2-gtk-4.0, gir1.2-adw-1, asusctl, supergfxctl, pciutils, procps, smartmontools
 Description: GTK control center for supported ASUS laptops

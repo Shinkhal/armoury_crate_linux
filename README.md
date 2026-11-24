@@ -28,7 +28,7 @@ See [the monitoring and hardware support guide](docs/monitoring-and-controls.md)
 ## Source layout
 
 - `src/app.py` and `src/window.py` provide startup and the shared application shell.
-- `src/pages/` contains the dashboard, device, cooling, battery, lighting, and GPU pages.
+- `src/pages/` contains the dashboard, device, system-configuration, battery, lighting, and GPU views. Scenario profile controls are part of the dashboard.
 - `src/components/` contains reusable GTK widgets; `src/hardware/` contains Linux telemetry and ASUS control integrations.
 - `src/config.py` and `src/styles.py` hold app settings and shared GTK styling.
 - `assets/` contains optional artwork and UI icons.

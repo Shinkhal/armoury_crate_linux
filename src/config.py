@@ -66,7 +66,6 @@ EFFECT_DESCRIPTIONS = {
     "pulse": "A steady single-colour pulse.", "comet": "A single-colour comet trail.",
     "flash": "A single-colour flash.",
 }
-GPU_MODES = ["Integrated", "Hybrid"]
 PPD_NAME = "org.freedesktop.UPower.PowerProfiles"
 PPD_PATH = "/org/freedesktop/UPower/PowerProfiles"
 PPD_IFACE = "org.freedesktop.UPower.PowerProfiles"
